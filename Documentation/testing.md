@@ -25,3 +25,6 @@ its own behavior tests before implementation. All later tests are pending.
 
 ## Phase 1
 Unity EditMode: 8 passed (7 new core tests plus bootstrap); zero failed/skipped.
+
+## Phase 2
+PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured movement lock checked with CharacterController on a primitive floor. Prototype scene generated successfully. Input and camera compile; manual feel testing remains.
