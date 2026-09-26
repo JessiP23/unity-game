@@ -33,6 +33,12 @@ namespace NightSupermarket.Game
                 var box = PrimitiveWorld.Box(transform, "Collectible crate", new Vector3(-2 + i * 2, 0.5f, -8), Vector3.one * 0.6f, Color.yellow);
                 box.AddComponent<PhysicalItem>().Configure(itemData, signals);
             }
+            var keyData = ScriptableObject.CreateInstance<ItemDefinition>(); keyData.id = "employee-key";
+            keyData.displayName = "Employee key"; keyData.inventoryOnly = true; keyData.slotCost = 0;
+            var key = PrimitiveWorld.Box(transform, "Employee key", new Vector3(9, 0.5f, -10), Vector3.one * 0.3f, Color.cyan);
+            key.AddComponent<PhysicalItem>().Configure(keyData, signals);
+            var door = PrimitiveWorld.Box(transform, "Employee door", new Vector3(10, 1.3f, 5), new Vector3(2, 2.6f, 0.3f), Color.blue);
+            door.AddComponent<DoorInteractable>().Configure("employee-key", signals);
             var guard = GameObject.CreatePrimitive(PrimitiveType.Capsule); guard.name = "Guard";
             guard.transform.SetParent(transform); guard.transform.position = new Vector3(3, 1, -5);
             guard.layer = 2; guard.transform.rotation = Quaternion.Euler(0, 180, 0);

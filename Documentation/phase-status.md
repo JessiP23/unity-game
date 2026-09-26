@@ -9,7 +9,7 @@
 | 4 | Physical object interaction | Passed: 4 PlayMode total; push wired, dedicated coverage pending |
 | 5 | Inventory | Passed: 16 EditMode total |
 | 6 | Missions | Passed: 24 EditMode total |
-| 7 | Keys and doors | Pending |
+| 7 | Keys and doors | Passed: 26 EditMode total |
 | 8 | Guard AI and hearing | Pending |
 | 9 | Capture, warehouse, surveillance, rescue | Pending |
 | 10 | Timer, escape, outcomes | Pending |

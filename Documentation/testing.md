@@ -40,3 +40,6 @@ PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured m
 
 ## Phase 6
 24 EditMode passed. All seven mission kinds, duplicate object/events, wrong tag/destination, personal owner and terminal failure covered.
+
+## Phase 7
+26 EditMode passed. Doors reject missing/wrong keys; reusable and consumed key behavior and locked/open toggles covered.
