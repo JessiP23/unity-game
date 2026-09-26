@@ -1,6 +1,7 @@
 using NightSupermarket.Core;
 using System;
 using UnityEngine;
+using UnityEngine.AI;
 namespace NightSupermarket.Game
 {
     [RequireComponent(typeof(Rigidbody))]
@@ -8,14 +9,34 @@ namespace NightSupermarket.Game
     {
         public string Id { get; } = Guid.NewGuid().ToString("N");
         public ItemDefinition Definition { get; private set; }
-        public CarrySystem Holder { get; internal set; }
+        /// <summary>While held the item travels with its carrier, so it stops carving the NavMesh.</summary>
+        public CarrySystem Holder
+        {
+            get => holder;
+            internal set { holder = value; if (obstacle != null) obstacle.enabled = value == null; }
+        }
         public bool Broken { get; private set; }
         public Rigidbody Body { get; private set; }
         public string LastActor { get; private set; } = "";
         public string Prompt => Broken ? "Broken" : "E — pick up " + Definition.displayName;
         private WorldSignals signals;
+        private CarrySystem holder;
+        private NavMeshObstacle obstacle;
         public void Configure(ItemDefinition definition, WorldSignals world)
-        { Definition = definition; signals = world; Body = GetComponent<Rigidbody>(); Body.mass = definition.mass; }
+        {
+            Definition = definition; signals = world; Body = GetComponent<Rigidbody>(); Body.mass = definition.mass;
+            if (!definition.inventoryOnly) Carve();
+        }
+        /// <summary>Resting world items cut a hole in the NavMesh so the guard walks around them.</summary>
+        private void Carve()
+        {
+            if (!TryGetComponent(out obstacle)) obstacle = gameObject.AddComponent<NavMeshObstacle>();
+            obstacle.shape = NavMeshObstacleShape.Box;
+            if (TryGetComponent(out BoxCollider box)) { obstacle.center = box.center; obstacle.size = box.size; }
+            obstacle.carving = true;
+            obstacle.carveOnlyStationary = true;
+            obstacle.carvingMoveThreshold = 0.1f;
+        }
         public bool TryInteract(PlayerMotor player)
         {
             if (!gameObject.activeInHierarchy || Broken || Holder != null || !Definition.canPickup || !InteractionValidation.CanReach(player, transform)) return false;

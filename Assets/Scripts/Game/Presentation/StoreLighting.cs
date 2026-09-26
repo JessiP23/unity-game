@@ -140,7 +140,7 @@ namespace NightSupermarket.Game
             foreach (var lamp in emergency) lamp.enabled = mode == LightingMode.Emergency || mode == LightingMode.Dark;
             foreach (var lamp in emergency) lamp.intensity = mode == LightingMode.Emergency ? 7f : 1.6f;
             if (dawn != null) dawn.intensity = mode == LightingMode.Dawn ? 60f : 0f;
-            StoreDressing.SetSignBrightness(mode == LightingMode.Dark ? 0.25f : mode == LightingMode.Emergency ? 0.4f : 1f);
+            SignFactory.SetBrightness(mode == LightingMode.Dark ? 0.25f : mode == LightingMode.Emergency ? 0.4f : 1f);
             RenderSettings.ambientLight = mode switch
             {
                 LightingMode.Dark => new Color(0.026f, 0.028f, 0.04f),

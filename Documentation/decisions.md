@@ -26,3 +26,5 @@
 18. A player can drive the same guard body. That replaces navigation input only. Vision, hearing, and detection stay on that body.
 19. Realistic art comes from Poly Haven (CC0 photoscanned props and surfaces) and Microsoft Rocketbox (MIT rigged humans and clips). The Asset Store top-free chart and itch.io free Unity tag were reviewed; they are mostly tools, low-poly, or stylized, and complete realistic supermarkets are paid. Redistributed paid packs are not used.
 20. Visuals never feed gameplay. Character animation speed is measured from how far the body moved, and mannequins hold their current frame when they stop so they freeze mid-step.
+21. Movement stays fixed-step for authority (and later Fusion), with acceleration and deceleration in `GameRulesAsset`. Smoothness comes from `MotionInterpolator` on cameras and bodies, not from moving gameplay into Update. Stopping from a sprint takes about 0.2 s so the freeze mechanic stays responsive.
+22. Resting physical items and solid floor props carve the NavMesh, so the guard walks around them. A PlayMode test puts a crate on the guard's path and fails without carving.

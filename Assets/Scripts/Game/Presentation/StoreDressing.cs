@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using NightSupermarket.Core;
 using UnityEngine;
-using UnityEngine.AI;
+using static NightSupermarket.Game.DressingKit;
+using static NightSupermarket.Game.ShelfStocker;
+using static NightSupermarket.Game.SignFactory;
 using Random = System.Random;
 namespace NightSupermarket.Game
 {
@@ -22,14 +24,6 @@ namespace NightSupermarket.Game
             new[] { "wine_bottles_01", "hamburger_buns", "long_life_food", "wine_bottles_01" },
         };
         private static readonly string[] AisleNames = { "1  CANNED & DRY FOOD", "2  CLEANING & HOUSEHOLD", "3  WINE & BAKERY" };
-        private static readonly Dictionary<string, (Vector3 size, Vector3 offset)> Footprints = new Dictionary<string, (Vector3, Vector3)>();
-        private static Font font;
-        private static Material textMaterial;
-        /// <summary>Sign text is unlit; dim it when the store lights go out.</summary>
-        public static void SetSignBrightness(float level)
-        {
-            if (textMaterial != null) textMaterial.SetColor("_Color", new Color(level, level, level, 1));
-        }
 
         public static void Apply(Transform root, LightingMode mode)
         {
@@ -166,44 +160,6 @@ namespace NightSupermarket.Game
                 }
         }
 
-        /// <summary>Lines up product facings along a shelf board in the unit's local space.</summary>
-        private static void Stock(Transform unit, float y, float halfWidth, float halfDepth, string[] products, Random rng)
-        {
-            float x = -halfWidth;
-            while (x < halfWidth)
-            {
-                string id = products[rng.Next(products.Length)];
-                var (size, offset) = Footprint(id);
-                if (size == Vector3.zero) return;
-                int facings = rng.Next(2, 5);
-                for (int f = 0; f < facings; f++)
-                {
-                    float width = size.x + 0.012f;
-                    if (x + width > halfWidth) return;
-                    int rows = size.z < halfDepth ? Mathf.Clamp(Mathf.FloorToInt(halfDepth * 2 / (size.z + 0.01f)), 1, 3) : 1;
-                    for (int r = 0; r < rows; r++)
-                    {
-                        float z = halfDepth - size.z * 0.5f - r * (size.z + 0.01f);
-                        float yaw = (float)(rng.NextDouble() * 6 - 3);
-                        var item = ArtLibrary.Spawn(id, unit, Vector3.zero, yaw);
-                        if (item != null) item.transform.localPosition = new Vector3(x + width * 0.5f, y, z) + Quaternion.Euler(0, yaw, 0) * offset;
-                    }
-                    x += width;
-                }
-            }
-        }
-
-        private static (Vector3 size, Vector3 offset) Footprint(string id)
-        {
-            if (Footprints.TryGetValue(id, out var cached)) return cached;
-            var probe = ArtLibrary.Spawn(id, null, Vector3.zero, 0);
-            if (probe == null) return Footprints[id] = (Vector3.zero, Vector3.zero);
-            var bounds = ArtLibrary.BoundsOf(probe);
-            Object.Destroy(probe);
-            var result = (bounds.size, new Vector3(-bounds.center.x, -bounds.min.y, -bounds.center.z));
-            return Footprints[id] = result;
-        }
-
         private static void Produce(Transform parent, Vector3 table, Vector3 scale, Random rng)
         {
             string[] fruit = { "food_apple_01", "lemon", "food_lime_01", "yellow_onion", "sweet_potato", "food_avocado_01", "food_apple_01", "lemon", "yellow_onion", "sweet_potato" };
@@ -214,20 +170,7 @@ namespace NightSupermarket.Game
                 {
                     var crate = new Vector3(table.x - 0.27f + col * 0.54f, top, table.z - 1.02f + row * 0.51f);
                     ArtLibrary.Spawn("plastic_crate_02", parent, crate, 90);
-                    string id = fruit[(slot + row * 2 + col) % fruit.Length];
-                    var (size, offset) = Footprint(id);
-                    if (size == Vector3.zero) continue;
-                    float step = Mathf.Max(size.x, size.z) * 1.02f;
-                    for (float fx = -0.17f; fx <= 0.17f; fx += step)
-                        for (float fz = -0.2f; fz <= 0.2f; fz += step)
-                        {
-                            float mound = 0.02f + (0.2f - Mathf.Abs(fz)) * 0.25f + (0.17f - Mathf.Abs(fx)) * 0.2f;
-                            float yaw = rng.Next(0, 360);
-                            var item = ArtLibrary.Spawn(id, parent, Vector3.zero, yaw);
-                            if (item == null) continue;
-                            item.transform.localRotation = Quaternion.Euler(rng.Next(-20, 20), yaw, rng.Next(-20, 20));
-                            item.transform.localPosition = crate + new Vector3(fx, 0.12f + mound, fz) + item.transform.localRotation * offset;
-                        }
+                    Heap(parent, fruit[(slot + row * 2 + col) % fruit.Length], crate + Vector3.up * 0.12f, new Vector2(0.17f, 0.2f), rng);
                 }
             if (slot == 0)
                 for (int b = 0; b < 3; b++)
@@ -266,9 +209,9 @@ namespace NightSupermarket.Game
                     for (int z = 0; z < 2; z++)
                         for (int y = 0; y < 3 - (x + z) % 2; y++)
                             ArtLibrary.Spawn("cardboard_box_01", parent, basePoint + new Vector3(-0.6f + x * 0.4f, 0.17f + y * 0.34f, -0.27f + z * 0.53f), rng.Next(-4, 4));
-            ArtLibrary.Spawn("WetFloorSign_01", parent, new Vector3(2.4f, 0, -1.5f), 35);
-            ArtLibrary.Spawn("metal_trash_can", parent, new Vector3(12.8f, 0, -14.3f), 180, 0.9f);
-            ArtLibrary.Spawn("korean_fire_extinguisher_01", parent, new Vector3(6.3f, 0.02f, -14.45f), 180);
+            Solid(ArtLibrary.Spawn("WetFloorSign_01", parent, new Vector3(2.4f, 0, -1.5f), 35));
+            Solid(ArtLibrary.Spawn("metal_trash_can", parent, new Vector3(12.8f, 0, -14.3f), 180, 0.9f));
+            Solid(ArtLibrary.Spawn("korean_fire_extinguisher_01", parent, new Vector3(6.3f, 0.02f, -14.45f), 180));
             Wall(parent, "fire_alarm", new Vector3(6.3f, 1.45f, -14.73f), 0);
             Wall(parent, "wall_clock", new Vector3(14.73f, 2.4f, -7f), -90);
             Wall(parent, "wall_clock", new Vector3(-14.73f, 2.4f, 6f), 90);
@@ -310,15 +253,15 @@ namespace NightSupermarket.Game
 
         private static void Warehouse(Transform parent)
         {
-            ArtLibrary.Spawn("hand_truck", parent, new Vector3(-8.7f, 0, 9.1f), -120);
+            Solid(ArtLibrary.Spawn("hand_truck", parent, new Vector3(-8.7f, 0, 9.1f), -120));
             Blocker(parent, "Crates", new Vector3(-8.75f, 0, 11.3f), new Vector3(0.6f, 0.95f, 1.2f));
             ArtLibrary.Spawn("wooden_crate_02", parent, new Vector3(-8.75f, 0, 11.3f), 90);
             ArtLibrary.Spawn("wooden_crate_02", parent, new Vector3(-8.75f, 0.46f, 11.3f), 93);
-            ArtLibrary.Spawn("Barrel_02", parent, new Vector3(-8.6f, 0, 12.6f), 0);
-            ArtLibrary.Spawn("plastic_container", parent, new Vector3(-13.9f, 0, 8.65f), 0);
+            Solid(ArtLibrary.Spawn("Barrel_02", parent, new Vector3(-8.6f, 0, 12.6f), 0));
+            Solid(ArtLibrary.Spawn("plastic_container", parent, new Vector3(-13.9f, 0, 8.65f), 0));
             ArtLibrary.Spawn("plastic_container", parent, new Vector3(-13.9f, 0.43f, 8.65f), 4);
-            ArtLibrary.Spawn("trashbag", parent, new Vector3(-9.3f, 0, 14.4f), 20);
-            ArtLibrary.Spawn("trashbag", parent, new Vector3(-8.7f, 0, 14.2f), 140);
+            Solid(ArtLibrary.Spawn("trashbag", parent, new Vector3(-9.3f, 0, 14.4f), 20));
+            Solid(ArtLibrary.Spawn("trashbag", parent, new Vector3(-8.7f, 0, 14.2f), 140));
             Wall(parent, "industrial_wall_lamp", new Vector3(-8.2f, 2.3f, 10f), -90);
             Wall(parent, "power_box_01", new Vector3(-8.22f, 1.5f, 12.4f), -90);
         }
@@ -327,7 +270,7 @@ namespace NightSupermarket.Game
         {
             var floor = new Vector3(desk.x, 0, desk.z);
             ArtLibrary.Spawn("metal_office_desk", parent, floor, 180);
-            ArtLibrary.Spawn("metal_stool_03", parent, floor + new Vector3(0.2f, 0, -0.95f), 20);
+            Solid(ArtLibrary.Spawn("metal_stool_03", parent, floor + new Vector3(0.2f, 0, -0.95f), 20));
             ArtLibrary.Spawn("clipboard", parent, floor + new Vector3(0.65f, 0.78f, -0.15f), 15);
             var screen = ArtLibrary.Emissive(new Color(0.35f, 0.95f, 0.65f), 1.6f);
             foreach (float x in new[] { -0.45f, 0.35f })
@@ -341,20 +284,20 @@ namespace NightSupermarket.Game
         private static void RescuePanel(Transform parent, StoreLighting lighting, Vector3 console)
         {
             var floor = new Vector3(console.x, 0, console.z);
-            ArtLibrary.Spawn("utility_box_01", parent, floor, 180);
+            Solid(ArtLibrary.Spawn("utility_box_01", parent, floor, 180));
             Panel(parent, "Release lamp", floor + new Vector3(0, 1.18f, -0.2f), new Vector3(0.08f, 0.08f, 0.04f)).sharedMaterial = ArtLibrary.Emissive(new Color(0.2f, 1f, 0.4f), 3f);
             lighting.AddGlow(floor + new Vector3(0, 1.2f, -0.5f), new Color(0.2f, 1f, 0.4f), 2f, 0.7f);
         }
 
         private static void StaffRoom(Transform parent)
         {
-            ArtLibrary.Spawn("ladder_sectioned_01", parent, new Vector3(14.6f, 0, 12f), -90);
+            Solid(ArtLibrary.Spawn("ladder_sectioned_01", parent, new Vector3(14.6f, 0, 12f), -90));
             ArtLibrary.Spawn("plastic_broom", parent, new Vector3(14.45f, 0, 9.2f), -90);
-            ArtLibrary.Spawn("metal_trash_can", parent, new Vector3(9.4f, 0, 14.4f), 0, 0.9f);
-            ArtLibrary.Spawn("trashbag", parent, new Vector3(13.2f, 0, 14.3f), 60);
-            ArtLibrary.Spawn("Barrel_02", parent, new Vector3(14.4f, 0, 14.4f), 0);
-            ArtLibrary.Spawn("hand_truck", parent, new Vector3(9f, 0, 6.2f), 30);
-            ArtLibrary.Spawn("WetFloorSign_01", parent, new Vector3(9.6f, 0, 7.2f), 0);
+            Solid(ArtLibrary.Spawn("metal_trash_can", parent, new Vector3(9.4f, 0, 14.4f), 0, 0.9f));
+            Solid(ArtLibrary.Spawn("trashbag", parent, new Vector3(13.2f, 0, 14.3f), 60));
+            Solid(ArtLibrary.Spawn("Barrel_02", parent, new Vector3(14.4f, 0, 14.4f), 0));
+            Solid(ArtLibrary.Spawn("hand_truck", parent, new Vector3(8.7f, 0, 8.6f), 60));
+            Solid(ArtLibrary.Spawn("WetFloorSign_01", parent, new Vector3(9.6f, 0, 7.2f), 0));
             ArtLibrary.Spawn("clipboard", parent, new Vector3(12.3f, 1.2f, 8f), -30);
             Wall(parent, "power_box_01", new Vector3(8.17f, 1.5f, 11f), 90);
             Wall(parent, "wall_clock", new Vector3(8.17f, 2.3f, 8f), 90);
@@ -397,98 +340,6 @@ namespace NightSupermarket.Game
             Sign(parent, "CHECKOUT", new Vector3(9.5f, 2.55f, -8.6f), 0, 0.17f, navy, Color.white, true, 0, true);
         }
 
-        /// <summary>Flat sign; readers stand on the side <paramref name="yaw"/> faces away from (local -Z).</summary>
-        private static void Sign(Transform parent, string text, Vector3 position, float yaw, float letterHeight, Color panel, Color ink, bool doubleSided, float glow = 0, bool hang = false)
-        {
-            var sign = new GameObject("Sign " + text).transform;
-            sign.SetParent(parent, false);
-            sign.localPosition = position;
-            sign.localRotation = Quaternion.Euler(0, yaw, 0);
-            float width = text.Length * letterHeight * 0.68f + letterHeight * 1.6f;
-            var board = Panel(sign, "Board", Vector3.zero, new Vector3(width, letterHeight * 2f, 0.04f));
-            board.transform.localPosition = Vector3.zero;
-            board.transform.localRotation = Quaternion.identity;
-            board.sharedMaterial = glow > 0 ? ArtLibrary.Emissive(panel, glow) : ArtLibrary.Lit(panel, 0.35f);
-            Text(sign, text, new Vector3(0, 0, -0.022f), 0, letterHeight, ink);
-            if (doubleSided) Text(sign, text, new Vector3(0, 0, 0.022f), 180, letterHeight, ink);
-            if (!hang) return;
-            float drop = 3.0f - position.y - letterHeight;
-            var wire = ArtLibrary.Lit(new Color(0.2f, 0.2f, 0.2f), 0.4f, 0.8f);
-            foreach (float side in new[] { -1f, 1f })
-                Panel(sign, "Sign wire", new Vector3(side * (width * 0.5f - 0.08f), letterHeight + drop * 0.5f, 0), new Vector3(0.012f, drop, 0.012f)).sharedMaterial = wire;
-        }
-
-        private static void Text(Transform sign, string text, Vector3 position, float yaw, float letterHeight, Color ink)
-        {
-            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (font == null) return;
-            if (textMaterial == null)
-            {
-                var template = Resources.Load<Material>("Materials/WorldText");
-                textMaterial = template != null ? new Material(template) : new Material(font.material);
-                textMaterial.mainTexture = font.material.mainTexture;
-                Font.textureRebuilt += rebuilt => { if (rebuilt == font && textMaterial != null) textMaterial.mainTexture = rebuilt.material.mainTexture; };
-            }
-            var label = new GameObject("Text");
-            label.transform.SetParent(sign, false);
-            label.transform.localPosition = position;
-            label.transform.localRotation = Quaternion.Euler(0, yaw, 0);
-            var mesh = label.AddComponent<TextMesh>();
-            mesh.font = font; mesh.text = text; mesh.fontSize = 96;
-            mesh.characterSize = letterHeight * 10f / 96f * 1.4f;
-            mesh.anchor = TextAnchor.MiddleCenter; mesh.alignment = TextAlignment.Center;
-            mesh.color = ink;
-            label.GetComponent<MeshRenderer>().sharedMaterial = textMaterial;
-        }
-
-
-        // ---- Helpers ----------------------------------------------------------------------------
-
-        /// <summary>Static-batches readable meshes. Text meshes are rebuilt by Unity and must stay separate.</summary>
-        private static void Batch(Transform root)
-        {
-            var batchable = new List<GameObject>();
-            foreach (var filter in root.GetComponentsInChildren<MeshFilter>())
-            {
-                var mesh = filter.sharedMesh;
-                if (mesh == null || !mesh.isReadable || filter.GetComponent<TextMesh>() != null) continue;
-                batchable.Add(filter.gameObject);
-            }
-            StaticBatchingUtility.Combine(batchable.ToArray(), root.gameObject);
-        }
-
-        private static void Skin(MeshRenderer renderer, string surface, float metersPerTile, Color tint, float smoothness, bool floor)
-        {
-            var scale = renderer.transform.lossyScale;
-            var tiling = floor ? new Vector2(scale.x, scale.z) / metersPerTile
-                               : new Vector2(Mathf.Max(scale.x, scale.z), scale.y) / metersPerTile;
-            tiling = new Vector2(Mathf.Max(0.5f, Mathf.Round(tiling.x * 2) / 2), Mathf.Max(0.5f, Mathf.Round(tiling.y * 2) / 2));
-            var material = ArtLibrary.Surface(surface, tiling, tint, smoothness);
-            if (material != null) renderer.sharedMaterial = material;
-        }
-
-        private static MeshRenderer Panel(Transform parent, string name, Vector3 position, Vector3 size)
-        {
-            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            box.name = name;
-            Object.Destroy(box.GetComponent<Collider>());
-            box.transform.SetParent(parent, false);
-            box.transform.localPosition = position;
-            box.transform.localScale = size;
-            return box.GetComponent<MeshRenderer>();
-        }
-
         private static void Wall(Transform parent, string id, Vector3 position, float yaw) => ArtLibrary.Spawn(id, parent, position, yaw);
-
-        /// <summary>Invisible collider for dressing that must block players and the guard.</summary>
-        private static void Blocker(Transform parent, string name, Vector3 floor, Vector3 size)
-        {
-            var blocker = new GameObject(name + " blocker");
-            blocker.transform.SetParent(parent, false);
-            blocker.transform.localPosition = floor + Vector3.up * size.y * 0.5f;
-            blocker.AddComponent<BoxCollider>().size = size;
-            var obstacle = blocker.AddComponent<NavMeshObstacle>();
-            obstacle.shape = NavMeshObstacleShape.Box; obstacle.size = size; obstacle.carving = true;
-        }
     }
 }

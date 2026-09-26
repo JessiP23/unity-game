@@ -3,7 +3,8 @@
   "references": [
     "NightSupermarket.Editor",
     "NightSupermarket.Core",
-    "NightSupermarket.Game"
+    "NightSupermarket.Game",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [
     "Editor"

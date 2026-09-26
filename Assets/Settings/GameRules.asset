@@ -26,13 +26,18 @@ MonoBehaviour:
   sprintSpeed: 5
   jumpHeight: 1
   gravity: 20
-  lookSensitivity: 0.12
+  acceleration: 20
+  deceleration: 26
+  airControl: 0.35
+  lookSensitivity: 0.22
   interactionDistance: 2.5
   throwForce: 8
   visionDistance: 12
   fieldOfView: 90
   hearingRadius: 12
   guardSpeed: 2
+  guardChaseSpeed: 3.6
+  guardTurnSpeed: 300
   searchDuration: 4
   patrolWait: 1
   captureDistance: 1.5

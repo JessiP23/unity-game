@@ -11,7 +11,17 @@ namespace NightSupermarket.Game
         public GuardBrain Brain { get; private set; }
         public Vector3 LastKnownPosition { get; private set; }
         public bool DebugVision { get; set; } = true;
-        public bool PlayerDriven { get; set; }
+        /// <summary>Input replaces patrol goals; turning and interpolation follow who drives the body.</summary>
+        public bool PlayerDriven
+        {
+            get => playerDriven;
+            set
+            {
+                playerDriven = value;
+                var interpolator = GetComponent<MotionInterpolator>();
+                if (interpolator != null) { interpolator.Interpolating = value; interpolator.Snap(); }
+            }
+        }
         public GuardFlashlight Flashlight { get; set; }
         private NavMeshAgent agent;
         private GameRulesAsset rules;
@@ -19,11 +29,17 @@ namespace NightSupermarket.Game
         private int waypoint;
         private IDisposable hearing;
         private GuardVisionSystem vision;
+        private bool playerDriven, searching;
+        private float cruiseSpeed;
         public void Configure(GameRulesAsset config, WorldSignals world, Vector3[] points)
         {
             rules = config; patrol = points; Brain = new GuardBrain(config.patrolWait, config.searchDuration);
             agent = GetComponent<NavMeshAgent>(); agent.speed = config.guardSpeed; agent.baseOffset = 1;
             agent.radius = 0.35f; agent.height = 2; agent.stoppingDistance = 0.3f;
+            agent.acceleration = 6f; agent.autoBraking = true; agent.updateRotation = false;
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
+            if (!TryGetComponent(out MotionInterpolator interpolator)) interpolator = gameObject.AddComponent<MotionInterpolator>();
+            interpolator.Interpolating = playerDriven;
             vision = new GuardVisionSystem(config.visionDistance, config.fieldOfView, ~(1 << 2));
             hearing = world.Noise.Subscribe(noise =>
             {
@@ -83,13 +99,26 @@ namespace NightSupermarket.Game
             Brain.Tick(arrived, threat, canCapture, delta);
             if (Brain.AdvancePatrol) waypoint = (waypoint + 1) % patrol.Length;
             bool search = Brain.State == GuardState.Search || Brain.State == GuardState.Capture;
-            agent.isStopped = search; agent.updateRotation = !search;
-            if (search) transform.Rotate(0, 45 * delta, 0);
-            else
+            searching = search;
+            agent.isStopped = search;
+            cruiseSpeed = Brain.State == GuardState.Chase ? rules.guardChaseSpeed : rules.guardSpeed;
+            if (!search)
             {
                 Vector3 destination = Brain.State == GuardState.Patrol || Brain.State == GuardState.ReturnToPatrol ? patrol[waypoint] : LastKnownPosition;
                 if (NavMesh.SamplePosition(destination, out var hit, 3, NavMesh.AllAreas)) agent.SetDestination(hit.position);
             }
+        }
+        /// <summary>Turns the body toward its walking direction at a human rate instead of snapping.</summary>
+        private void Update()
+        {
+            if (playerDriven || agent == null || rules == null || !agent.isOnNavMesh) return;
+            if (searching) { transform.Rotate(0, 45 * Time.deltaTime, 0); return; }
+            Vector3 heading = agent.desiredVelocity; heading.y = 0;
+            if (heading.sqrMagnitude < 0.04f) return;
+            var facing = Quaternion.LookRotation(heading);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, facing, rules.guardTurnSpeed * Time.deltaTime);
+            float aligned = Mathf.Clamp01(Vector3.Dot(transform.forward, heading.normalized));
+            agent.speed = Mathf.Max(0.1f, (cruiseSpeed > 0 ? cruiseSpeed : rules.guardSpeed) * Mathf.Lerp(0.3f, 1f, aligned));
         }
         private void OnDrawGizmos()
         {

@@ -22,10 +22,14 @@ namespace NightSupermarket.Tests
                 cube.transform.position = actor.transform.position + Vector3.forward * 10; Physics.SyncTransforms();
                 Assert.That(physical.TryInteract(motor), Is.False);
                 cube.transform.position = actor.transform.position + Vector3.forward; Physics.SyncTransforms();
+                var carve = cube.GetComponent<UnityEngine.AI.NavMeshObstacle>();
+                Assert.That(carve != null && carve.enabled && carve.carving, Is.True, "resting items carve the NavMesh");
                 Assert.That(physical.TryInteract(motor), Is.True);
                 Assert.That(physical.TryInteract(motor), Is.False);
+                Assert.That(carve.enabled, Is.False, "held items stop carving");
                 Assert.That(physical.Holder, Is.EqualTo(carry)); Assert.That(carry.Release(false), Is.True);
                 Assert.That(physical.Holder, Is.Null);
+                Assert.That(carve.enabled, Is.True);
                 cube.transform.position = actor.transform.position + Vector3.forward; Physics.SyncTransforms();
                 Assert.That(physical.TryInteract(motor), Is.True);
                 Assert.That(carry.Release(true), Is.True);
