@@ -1,0 +1,4 @@
+Poly Haven CC0 models and textures, https://polyhaven.com
+cardboard_box_01, steel_frame_shelves_01, security_camera_01, mounted_fluorescent_lights, brown_floor_tiles, beige_wall_001.
+CC0 does not require credit. Poly Haven asks that use of the library be credited when practical.
+These files are the published 1K downloads. They are not a complete supermarket.

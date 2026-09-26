@@ -87,6 +87,7 @@ namespace NightSupermarket.Game
                 pawn.Detection = new DetectionCoordinator(pawn.Motor, guard.transform, rules) { Flashlight = flashlight };
                 pawn.Pose.Configure(pawn.Motor, pawn.Detection.Detection);
             }
+            StoreDressing.Apply(transform);
             hud = gameObject.AddComponent<PrototypeHud>(); hud.Configure();
             SetActive(0);
             Cursor.lockState = CursorLockMode.Locked;
