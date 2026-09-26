@@ -12,9 +12,11 @@ namespace NightSupermarket.Game
             Model = new FlashlightModel(range, coneDegrees, true);
             var lamp = new GameObject("Flashlight");
             lamp.transform.SetParent(transform, false);
-            lamp.transform.localPosition = new Vector3(0, 1.4f, 0.4f);
+            lamp.transform.localPosition = new Vector3(0.22f, 0.4f, 0.35f);
             beam = lamp.AddComponent<Light>();
             beam.type = LightType.Spot; beam.range = range; beam.spotAngle = coneDegrees; beam.intensity = 6;
+            beam.innerSpotAngle = coneDegrees * 0.55f; beam.color = new Color(1f, 0.95f, 0.85f);
+            beam.shadows = LightShadows.Soft; beam.shadowStrength = 0.9f;
         }
         public void SetEnabled(bool enabled)
         {

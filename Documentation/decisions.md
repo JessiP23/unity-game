@@ -24,3 +24,5 @@
 16. PlayFab is not installed. The current Unity 6 package depends on Microsoft GDK, which this Mac editor does not use. Account data stays behind `IPlayerDataService` and is not mixed with match state.
 17. The guard flashlight is a gameplay cone the vision query can consume. The Unity `Light` does not decide detection.
 18. A player can drive the same guard body. That replaces navigation input only. Vision, hearing, and detection stay on that body.
+19. Realistic art comes from Poly Haven (CC0 photoscanned props and surfaces) and Microsoft Rocketbox (MIT rigged humans and clips). The Asset Store top-free chart and itch.io free Unity tag were reviewed; they are mostly tools, low-poly, or stylized, and complete realistic supermarkets are paid. Redistributed paid packs are not used.
+20. Visuals never feed gameplay. Character animation speed is measured from how far the body moved, and mannequins hold their current frame when they stop so they freeze mid-step.

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering.Universal;
 namespace NightSupermarket.Game
 {
     public sealed class PlayerView : MonoBehaviour
@@ -16,6 +17,10 @@ namespace NightSupermarket.Game
             var cameraObject = new GameObject("Player View", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false); cameraObject.transform.localPosition = Vector3.up * eyeHeight;
             View = cameraObject.GetComponent<Camera>(); View.nearClipPlane = 0.05f; View.fieldOfView = 75;
+            View.farClipPlane = 80; View.clearFlags = CameraClearFlags.SolidColor; View.backgroundColor = Color.black;
+            var data = View.GetUniversalAdditionalCameraData();
+            data.renderPostProcessing = true;
+            data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
         }
         private void Update()
         {

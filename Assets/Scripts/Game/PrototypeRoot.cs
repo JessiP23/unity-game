@@ -22,6 +22,7 @@ namespace NightSupermarket.Game
         private GuardController guardController;
         private PlayerInputReader guardInput;
         private PlayerView guardView;
+        private CharacterVisual guardVisual;
         private PrototypeHud hud;
         private int active;
         private bool help = true;
@@ -57,7 +58,7 @@ namespace NightSupermarket.Game
             doors.Add(CreateDoor("Employee door", new Vector3(10, 1.3f, 5), "employee-key", Color.blue));
             var rescue = PrimitiveWorld.Box(transform, "Rescue console", new Vector3(-11.1f, 0.7f, 6.6f), new Vector3(0.8f, 1.2f, 0.5f), new Color(0.1f, 0.8f, 0.4f));
             rescue.AddComponent<RescueInteractable>().Configure(authority);
-            var exit = PrimitiveWorld.Box(transform, "Escape door", new Vector3(5, 1.3f, -13), new Vector3(1.4f, 2.4f, 0.3f), new Color(0.8f, 0.2f, 0.7f));
+            var exit = PrimitiveWorld.Box(transform, "Escape door", new Vector3(5, 1.3f, -14.6f), new Vector3(1.4f, 2.4f, 0.3f), new Color(0.8f, 0.2f, 0.7f));
             exit.AddComponent<EscapeInteractable>().Configure(authority, "");
             var terminal = PrimitiveWorld.Box(transform, "Surveillance terminal", new Vector3(-12, 1f, 12.4f), new Vector3(0.8f, 0.6f, 0.4f), Color.black);
             terminal.transform.GetComponent<Renderer>().material.color = new Color(0.1f, 0.9f, 0.5f);
@@ -82,12 +83,14 @@ namespace NightSupermarket.Game
             guardInput = guard.AddComponent<PlayerInputReader>(); guardInput.Active = false;
             guardView = guard.AddComponent<PlayerView>(); guardView.ConfigureStandalone(rules.lookSensitivity, 0.6f);
             guardView.Active = false; guardView.View.gameObject.SetActive(false);
+            guardVisual = CharacterVisual.Attach(guard.transform, "Guard", new Vector3(0, -1, 0), false, "m_idle_look_around_01", "m_walk_slow_01", "m_run_neutral_01");
+            if (guardVisual != null) guard.GetComponent<MeshRenderer>().enabled = false;
             foreach (var pawn in pawns)
             {
                 pawn.Detection = new DetectionCoordinator(pawn.Motor, guard.transform, rules) { Flashlight = flashlight };
                 pawn.Pose.Configure(pawn.Motor, pawn.Detection.Detection);
             }
-            StoreDressing.Apply(transform);
+            StoreDressing.Apply(transform, authority.Lighting.Mode);
             hud = gameObject.AddComponent<PrototypeHud>(); hud.Configure();
             SetActive(0);
             Cursor.lockState = CursorLockMode.Locked;
@@ -106,6 +109,9 @@ namespace NightSupermarket.Game
             var pose = actor.AddComponent<PoseDriver>();
             authority.Register(record);
             int index = pawns.Count;
+            var visual = index % 2 == 0
+                ? CharacterVisual.Attach(actor.transform, "MannequinMale", Vector3.zero, true, "m_idle_neutral_01", "m_walk_neutral_01", "m_run_neutral_01")
+                : CharacterVisual.Attach(actor.transform, "MannequinFemale", Vector3.zero, true, "f_idle_neutral_01", "f_walk_neutral_01", "f_run_neutral_01");
             bool warehoused = false;
             record.Changed += state =>
             {
@@ -116,7 +122,7 @@ namespace NightSupermarket.Game
                     motor.Teleport(new Vector3(-1 + index * 2f, 0.1f, -9));
                 }
             };
-            return new Pawn { Motor = motor, Input = input, View = view, Probe = probe, Inventory = inventory, Pose = pose };
+            return new Pawn { Motor = motor, Input = input, View = view, Probe = probe, Inventory = inventory, Pose = pose, Visual = visual };
         }
         private DoorInteractable CreateDoor(string label, Vector3 position, string key, Color color)
         {
@@ -317,11 +323,13 @@ namespace NightSupermarket.Game
                 pawns[i].Input.Active = on;
                 pawns[i].View.Active = on;
                 pawns[i].View.View.gameObject.SetActive(on);
+                if (pawns[i].Visual != null) pawns[i].Visual.SetFirstPerson(on);
             }
             bool driving = active == pawns.Count;
             if (guardController != null) guardController.PlayerDriven = driving;
             if (guardInput != null) guardInput.Active = driving;
             if (guardView != null) { guardView.Active = driving; guardView.View.gameObject.SetActive(driving); }
+            if (guardVisual != null) guardVisual.SetFirstPerson(driving);
         }
         private string BuildHud()
         {
@@ -385,12 +393,14 @@ namespace NightSupermarket.Game
             public PlayerInventory Inventory;
             public PoseDriver Pose;
             public DetectionCoordinator Detection;
+            public CharacterVisual Visual;
         }
     }
     public static class LightingPresenter
     {
         public static void Apply(LightingMode mode)
         {
+            if (StoreLighting.Active != null) { StoreLighting.Active.Apply(mode); return; }
             RenderSettings.ambientLight = mode switch
             {
                 LightingMode.Dark => new Color(0.04f, 0.04f, 0.06f),

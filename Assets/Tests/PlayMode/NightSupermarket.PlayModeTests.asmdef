@@ -3,7 +3,8 @@
   "references": [
     "NightSupermarket.Core",
     "NightSupermarket.Game",
-    "Unity.AI.Navigation"
+    "Unity.AI.Navigation",
+    "Unity.RenderPipelines.Universal.Runtime"
   ],
   "includePlatforms": [],
   "optionalUnityReferences": [

@@ -55,6 +55,7 @@ namespace NightSupermarket.Editor
                 scenes.Insert(0, new EditorBuildSettingsScene(BootstrapSetup.ScenePath, true));
             EditorBuildSettings.scenes = scenes.ToArray();
             AssetDatabase.SaveAssets();
+            RenderingSetup.Configure();
             Debug.Log("[SETUP] Configuration saved. Restart the Editor before testing input.");
         }
 

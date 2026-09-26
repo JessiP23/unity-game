@@ -49,7 +49,23 @@ Transitive packages are resolved by Unity, with exact resolution recorded in
 Fusion 2 and PlayFab are still absent. Fusion 2.1.1 expects Unity 6000.3+, which
 is newer than the pinned 6000.0.71f1 Editor, so it was not added. See
 [networking](networking.md). No SDK credentials are stored in the project.
-No final art is imported.
+
+## Art
+Free art is downloaded, not hand-copied:
+```sh
+python3 Tools/fetch_art.py      # ~110 MB into Assets/Resources/Art, skips files already present
+python3 Tools/unity.py shots    # renders review screenshots to TestResults/Screenshots
+```
+Props and surfaces are Poly Haven (CC0). The guard and both mannequins, plus their
+idle/walk/run clips, are Microsoft Rocketbox (MIT). Credits and the MIT notice are
+in `Assets/Resources/Art/THIRD_PARTY.txt`. `Assets/Editor/ArtImportRules.cs` sets
+import settings for anything under `Resources/Art`, so fetched files need no
+hand-written `.meta`. `python3 Tools/unity.py setup` also runs rendering setup:
+Forward+, post-processing, SSAO, and soft flashlight shadows.
+
+Gameplay does not depend on art. The primitives keep every collider and rule;
+`StoreDressing` hides them and dresses the level after the NavMesh bake. With
+`Resources/Art` missing, the prototype falls back to plain primitives.
 
 The prototype scene is the local night loop: two mannequins, one guard body,
 collect/place objectives, an employee door, warehouse rescue and an escape door.
