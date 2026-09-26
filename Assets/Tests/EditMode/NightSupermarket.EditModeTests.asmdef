@@ -1,7 +1,9 @@
 {
   "name": "NightSupermarket.EditModeTests",
   "references": [
-    "NightSupermarket.Editor"
+    "NightSupermarket.Editor",
+    "NightSupermarket.Core",
+    "NightSupermarket.Game"
   ],
   "includePlatforms": [
     "Editor"

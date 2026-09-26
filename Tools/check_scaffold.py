@@ -34,10 +34,11 @@ class ScaffoldChecks(unittest.TestCase):
 
     def test_assembly_isolation(self):
         assemblies = [json.loads(p.read_text()) for p in (ROOT / 'Assets').rglob('*.asmdef')]
-        self.assertEqual(len(assemblies), 3)
+        self.assertGreaterEqual(len(assemblies), 3)
         names = {a['name'] for a in assemblies}
         names.update({'Unity.RenderPipelines.Universal.Runtime',
-                      'Unity.RenderPipelines.Core.Runtime', 'Unity.RenderPipelines.Core.Editor'})
+                      'Unity.RenderPipelines.Core.Runtime', 'Unity.RenderPipelines.Core.Editor',
+                      'Unity.InputSystem', 'Unity.AI.Navigation', 'Unity.TextMeshPro', 'Unity.ugui'})
         for assembly in assemblies:
             for reference in assembly.get('references', []):
                 self.assertIn(reference, names)

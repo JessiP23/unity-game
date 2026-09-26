@@ -3,7 +3,7 @@
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | 0 | Unity, dependencies, project configuration and test harness | Passed: import, setup, both smoke tests, Windows build |
-| 1 | Rules, state, events, service boundaries | Pending Phase 0 gate |
+| 1 | Rules, state, events, service boundaries | Passed: 7 core tests, 8 total EditMode |
 | 2 | Input, movement, camera | Pending |
 | 3 | Vision, detection, suspicion | Pending |
 | 4 | Physical object interaction | Pending |
