@@ -31,3 +31,6 @@ PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured m
 
 ## Phase 3
 13 EditMode and 3 PlayMode passed, zero failed/skipped. Covers grace reset/expiry, stillness/jitter, cadence, discovery modes/reset, and physics FOV/range/wall filtering.
+
+## Phase 4
+4 PlayMode passed. Added range rejection, pickup ownership, drop, thrown velocity and break-threshold checks. Pushing is implemented but needs dedicated physics coverage before final acceptance.

@@ -11,15 +11,23 @@ namespace NightSupermarket.Game
         private PlayerInputReader input;
         private InteractionProbe interaction;
         private DetectionCoordinator detection;
+        private readonly WorldSignals signals = new WorldSignals();
         private void Start()
         {
             PrimitiveWorld.Build(transform);
             var actor = new GameObject("Mannequin"); actor.transform.SetParent(transform);
             actor.transform.position = new Vector3(0, 0.1f, -11);
             Player = actor.AddComponent<PlayerMotor>(); Player.Configure(rules, new PlayerRecord(new LocalSession().Join()));
+            actor.AddComponent<CarrySystem>().Configure(Player);
             input = actor.AddComponent<PlayerInputReader>();
             var view = actor.AddComponent<PlayerView>(); view.Configure(Player);
             interaction = actor.AddComponent<InteractionProbe>(); interaction.Configure(Player, view);
+            var itemData = ScriptableObject.CreateInstance<ItemDefinition>(); itemData.canBreak = true;
+            for (int i = 0; i < 3; i++)
+            {
+                var box = PrimitiveWorld.Box(transform, "Collectible crate", new Vector3(-2 + i * 2, 0.5f, -8), Vector3.one * 0.6f, Color.yellow);
+                box.AddComponent<PhysicalItem>().Configure(itemData, signals);
+            }
             var guard = GameObject.CreatePrimitive(PrimitiveType.Capsule); guard.name = "Guard";
             guard.transform.SetParent(transform); guard.transform.position = new Vector3(3, 1, -5);
             guard.layer = 2; guard.transform.rotation = Quaternion.Euler(0, 180, 0);
@@ -34,7 +42,7 @@ namespace NightSupermarket.Game
         }
         private void OnGUI()
         {
-            GUI.Label(new Rect(15, 15, 700, 70), "NIGHT SUPERMARKET — PRIMITIVE PROTOTYPE\nWASD move · Shift sprint · Space jump · Mouse look · E interact · Esc release mouse");
+            GUI.Label(new Rect(15, 15, 700, 70), "NIGHT SUPERMARKET — PRIMITIVE PROTOTYPE\nWASD move · Shift sprint · Space jump · Mouse look · E interact · G drop · Q throw · Esc release mouse");
             if (detection != null) GUI.Label(new Rect(15, 120, 500, 30), $"Detection: {detection.Detection.State} | Suspicion: {detection.Detection.Suspicion.Value}");
             if (interaction != null) GUI.Label(new Rect(15, 85, 500, 30), interaction.Prompt);
         }

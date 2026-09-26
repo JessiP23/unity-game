@@ -40,6 +40,12 @@ namespace NightSupermarket.Game
             if (Record.State != PlayerState.Carrying)
                 Record.SetState(!controller.isGrounded ? PlayerState.Jumping : input.Sprint && move.sqrMagnitude > 0 ? PlayerState.Running : PlayerState.Normal);
         }
+        private void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            var item = hit.collider.GetComponent<PhysicalItem>();
+            if (item != null && Mathf.Abs(hit.moveDirection.y) < 0.5f)
+                item.Push(hit.moveDirection * 0.5f, this);
+        }
         public void Teleport(Vector3 position)
         {
             controller.enabled = false; transform.position = position; controller.enabled = true;

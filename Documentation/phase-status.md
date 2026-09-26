@@ -6,7 +6,7 @@
 | 1 | Rules, state, events, service boundaries | Passed: 7 core tests, 8 total EditMode |
 | 2 | Input, movement, camera | Passed: movement PlayMode test |
 | 3 | Vision, detection, suspicion | Passed: 13 EditMode, 3 PlayMode total |
-| 4 | Physical object interaction | Pending |
+| 4 | Physical object interaction | Passed: 4 PlayMode total; push wired, dedicated coverage pending |
 | 5 | Inventory | Pending |
 | 6 | Missions | Pending |
 | 7 | Keys and doors | Pending |
