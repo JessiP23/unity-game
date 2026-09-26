@@ -1,0 +1,6 @@
+{
+  "name": "NightSupermarket.Editor",
+  "includePlatforms": [
+    "Editor"
+  ]
+}

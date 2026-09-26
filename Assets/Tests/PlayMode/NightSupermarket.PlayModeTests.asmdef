@@ -1,0 +1,8 @@
+{
+  "name": "NightSupermarket.PlayModeTests",
+  "references": [],
+  "includePlatforms": [],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

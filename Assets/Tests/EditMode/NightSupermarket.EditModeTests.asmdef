@@ -1,0 +1,12 @@
+{
+  "name": "NightSupermarket.EditModeTests",
+  "references": [
+    "NightSupermarket.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
