@@ -12,12 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 764e2cd52c0f4412fb645fb12b8d212b, type: 3}
   m_Name: GameRules
   m_EditorClassIdentifier: 
+  missions:
+  - {fileID: 11400000, guid: e4a4378cd0cad417aa64d0d716892077, type: 2}
+  - {fileID: 11400000, guid: ca1fe01b12aa54ad48becaf431bf2b82, type: 2}
   matchDuration: 600
   orangeDuration: 1.5
   suspicionInterval: 1
   discoveryThreshold: 3
   movementThreshold: 0.08
   continuedMovementToDiscover: 1
+  inventoryCapacity: 8
   walkSpeed: 3
   sprintSpeed: 5
   jumpHeight: 1

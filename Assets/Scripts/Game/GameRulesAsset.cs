@@ -5,6 +5,7 @@ namespace NightSupermarket.Game
     [CreateAssetMenu(menuName = "Night Supermarket/Game Rules")]
     public sealed class GameRulesAsset : ScriptableObject
     {
+        public MissionDefinition[] missions = new MissionDefinition[0];
         [Min(1)] public float matchDuration = 600;
         [Min(0.01f)] public float orangeDuration = 1.5f;
         [Min(0.01f)] public float suspicionInterval = 1;

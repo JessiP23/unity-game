@@ -1,5 +1,6 @@
 using System.IO;
 using NightSupermarket.Game;
+using NightSupermarket.Core;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -15,6 +16,18 @@ namespace NightSupermarket.Editor
             Directory.CreateDirectory("Assets/Scenes/Prototype");
             var rules = AssetDatabase.LoadAssetAtPath<GameRulesAsset>("Assets/Settings/GameRules.asset");
             if (rules == null) { rules = ScriptableObject.CreateInstance<GameRulesAsset>(); AssetDatabase.CreateAsset(rules, "Assets/Settings/GameRules.asset"); }
+            if (rules.missions == null || rules.missions.Length == 0)
+            {
+                var collect = ScriptableObject.CreateInstance<MissionDefinition>();
+                collect.id = "collect-crates"; collect.title = "Collect three crates"; collect.targetTag = "object";
+                collect.kind = ActionKind.Collect; collect.quantity = 3;
+                AssetDatabase.CreateAsset(collect, "Assets/Settings/CollectCrates.asset");
+                var place = ScriptableObject.CreateInstance<MissionDefinition>();
+                place.id = "place-crate"; place.title = "Place a crate in the green clothing zone"; place.targetTag = "object";
+                place.kind = ActionKind.Place; place.quantity = 1; place.destination = "clothing";
+                AssetDatabase.CreateAsset(place, "Assets/Settings/PlaceCrate.asset");
+                rules.missions = new[] { collect, place }; EditorUtility.SetDirty(rules);
+            }
             if (!File.Exists(ScenePath))
             {
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);

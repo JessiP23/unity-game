@@ -37,3 +37,6 @@ PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured m
 
 ## Phase 5
 16 EditMode passed. Inventory tests cover capacity, quantities, zero-slot keys, invalid operations and independent read-only snapshots.
+
+## Phase 6
+24 EditMode passed. All seven mission kinds, duplicate object/events, wrong tag/destination, personal owner and terminal failure covered.
