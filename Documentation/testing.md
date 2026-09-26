@@ -28,3 +28,6 @@ Unity EditMode: 8 passed (7 new core tests plus bootstrap); zero failed/skipped.
 
 ## Phase 2
 PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured movement lock checked with CharacterController on a primitive floor. Prototype scene generated successfully. Input and camera compile; manual feel testing remains.
+
+## Phase 3
+13 EditMode and 3 PlayMode passed, zero failed/skipped. Covers grace reset/expiry, stillness/jitter, cadence, discovery modes/reset, and physics FOV/range/wall filtering.

@@ -5,7 +5,7 @@
 | 0 | Unity, dependencies, project configuration and test harness | Passed: import, setup, both smoke tests, Windows build |
 | 1 | Rules, state, events, service boundaries | Passed: 7 core tests, 8 total EditMode |
 | 2 | Input, movement, camera | Passed: movement PlayMode test |
-| 3 | Vision, detection, suspicion | Pending |
+| 3 | Vision, detection, suspicion | Passed: 13 EditMode, 3 PlayMode total |
 | 4 | Physical object interaction | Pending |
 | 5 | Inventory | Pending |
 | 6 | Missions | Pending |
