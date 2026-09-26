@@ -99,6 +99,13 @@ namespace NightSupermarket.Game
             return Vector3.Distance(start, end) / clip.length;
         }
 
+        /// <summary>Freezes a mannequin on a chosen frame of its idle clip, so display poses differ.</summary>
+        public void HoldPose(double seconds)
+        {
+            if (!graph.IsValid()) return;
+            idle.SetTime(seconds); idle.SetSpeed(0);
+        }
+
         /// <summary>Hides the body from its owner's camera while keeping its shadow.</summary>
         public void SetFirstPerson(bool firstPerson)
         {

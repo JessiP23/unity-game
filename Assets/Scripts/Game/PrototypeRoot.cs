@@ -24,25 +24,52 @@ namespace NightSupermarket.Game
         private CharacterVisual guardVisual;
         private PrototypeHud hud;
         private KeyCommandMap controls, testing;
+        private StoreDirectory directory;
+        private CustomerPopulationManager population;
+        private NpcDebugOverlay npcDebug;
+        private INetworkService network = new LocalNetworkService();
+        private FusionSession fusion;
+        public CustomerPopulationManager Population => population;
+        public StoreDirectory Directory => directory;
+        public LocalMatchAuthority Authority => authority;
+        public GuardController Guard => guardController;
+        public int MannequinCount => pawns.Count;
+        public PlayerMotor MannequinAt(int index) => pawns[index].Motor;
+        public PlayerInputReader InputAt(int index) => pawns[index].Input;
+        public MissionSystem Missions => missions;
         private int active;
         private bool help;
+        private MenuPage menuPage = MenuPage.Night;
+        private float timeScaleBeforeMenu = 1f;
+        private bool clockPausedBeforeMenu;
+        private string reportToast;
+        private float reportToastUntil;
+        private readonly List<SuspiciousActivityEvent> reportLog = new List<SuspiciousActivityEvent>();
+        private readonly HudModel hudModel = new HudModel();
         private bool logAudio = true;
         private bool missionsAnnounced;
         private IDisposable audioSubscription;
         private IDisposable actionSubscription;
         private IDisposable noiseSubscription;
+        private IDisposable reportSubscription;
         private void Start()
         {
             PrimitiveWorld.Build(transform);
+            directory = StoreLayout.Build(transform);
             BuildKeyMaps();
+            fusion = gameObject.AddComponent<FusionSession>();
+            network = fusion;
+            if (!Application.isBatchMode) fusion.ConnectHost();
             var session = new LocalSession();
             authority = new LocalMatchAuthority(rules.CreateRules(), session);
             authority.TryBeginNight();
             authority.Lighting.Changed += LightingPresenter.Apply;
             LightingPresenter.Apply(authority.Lighting.Mode);
             audioSubscription = authority.Audio.Subscribe(cue => { if (logAudio) log.Write("AUDIO", cue.ToString()); });
-            for (int i = 0; i < 2; i++) pawns.Add(CreatePawn(session, new Vector3(i * 1.6f, 0.1f, -11)));
-            var zone = PrimitiveWorld.Box(transform, "Clothing placement zone", new Vector3(-4, 0.15f, -7), new Vector3(3, 0.3f, 3), Color.green);
+            reportSubscription = authority.Reports.Subscribe(OnReport);
+            for (int i = 0; i < rules.mannequinPlayers; i++)
+                pawns.Add(CreatePawn(session, new Vector3(-5.4f + (i % 4) * 0.9f, 0.1f, 12.4f - (i / 4) * 0.8f)));
+            var zone = PrimitiveWorld.Box(transform, "Clothing placement zone", new Vector3(-4.2f, 0.15f, 7.0f), new Vector3(3, 0.3f, 3), Color.green);
             zone.AddComponent<PlacementZone>();
             var itemData = ScriptableObject.CreateInstance<ItemDefinition>(); itemData.canBreak = true;
             for (int i = 0; i < 3; i++)
@@ -50,6 +77,14 @@ namespace NightSupermarket.Game
                 var box = PrimitiveWorld.Box(transform, "Collectible crate", new Vector3(-2 + i * 2, 0.5f, -8), Vector3.one * 0.6f, Color.yellow);
                 box.layer = 3;
                 box.AddComponent<PhysicalItem>().Configure(itemData, signals);
+            }
+            var shirtData = ScriptableObject.CreateInstance<ItemDefinition>(); shirtData.id = "shirt";
+            shirtData.displayName = "Shirt"; shirtData.missionTag = "shirt"; shirtData.inventoryOnly = true; shirtData.slotCost = 1;
+            foreach (float x in new[] { -6.2f, -2.4f })
+            {
+                var shirt = PrimitiveWorld.Box(transform, "Shirt", new Vector3(x, 1.0f, 9.0f), new Vector3(0.4f, 0.08f, 0.32f), new Color(0.2f, 0.35f, 0.7f));
+                shirt.layer = 3;
+                shirt.AddComponent<PhysicalItem>().Configure(shirtData, signals);
             }
             var keyData = ScriptableObject.CreateInstance<ItemDefinition>(); keyData.id = "employee-key";
             keyData.displayName = "Employee key"; keyData.inventoryOnly = true; keyData.slotCost = 0;
@@ -81,6 +116,7 @@ namespace NightSupermarket.Game
             guardController = guard.AddComponent<GuardController>();
             guardController.Flashlight = flashlight;
             guardController.Configure(rules, signals, new[] { new Vector3(3, 0, -8), new Vector3(10, 0, 0), new Vector3(3, 0, 8), new Vector3(-10, 0, 0) });
+            guardController.InvestigateReports(authority.Reports);
             guardInput = guard.AddComponent<PlayerInputReader>(); guardInput.Active = false;
             guardView = guard.AddComponent<PlayerView>(); guardView.ConfigureStandalone(rules.lookSensitivity, 0.6f);
             guardView.Active = false; guardView.View.gameObject.SetActive(false);
@@ -92,14 +128,23 @@ namespace NightSupermarket.Game
                 pawn.Pose.Configure(pawn.Motor, pawn.Detection.Detection);
             }
             StoreDressing.Apply(transform, authority.Lighting.Mode);
-            hud = gameObject.AddComponent<PrototypeHud>(); hud.Configure();
+            population = gameObject.AddComponent<CustomerPopulationManager>();
+            population.Configure(directory, NpcPopulationSettings.Load(), authority.TryReport, () => Time.timeAsDouble, network.IsAuthority, Environment.TickCount);
+            population.Populate();
+            var debugHost = new GameObject("NPC debug");
+            debugHost.transform.SetParent(transform, false);
+            npcDebug = debugHost.AddComponent<NpcDebugOverlay>();
+            npcDebug.Configure(population);
+            hud = gameObject.AddComponent<PrototypeHud>();
+            hud.Configure();
+            hud.PagePicked = page => menuPage = page;
             SetActive(0);
             Cursor.lockState = CursorLockMode.Locked;
         }
         private Pawn CreatePawn(LocalSession session, Vector3 position)
         {
             var actor = new GameObject("Mannequin"); actor.transform.SetParent(transform);
-            actor.layer = 2; actor.transform.position = position;
+            actor.layer = 2; actor.transform.SetPositionAndRotation(position, Quaternion.Euler(0, 180, 0));
             var record = new PlayerRecord(session.Join());
             var motor = actor.AddComponent<PlayerMotor>(); motor.Configure(rules, record);
             actor.AddComponent<CarrySystem>().Configure(motor);
@@ -108,6 +153,10 @@ namespace NightSupermarket.Game
             var view = actor.AddComponent<PlayerView>(); view.Configure(motor);
             var probe = actor.AddComponent<InteractionProbe>(); probe.Configure(motor, view);
             var pose = actor.AddComponent<PoseDriver>();
+            actor.AddComponent<PerceptionTarget>();
+            var bodyObstacle = actor.AddComponent<NavMeshObstacle>();
+            bodyObstacle.shape = NavMeshObstacleShape.Capsule; bodyObstacle.radius = 0.3f; bodyObstacle.height = 1.8f;
+            bodyObstacle.center = new Vector3(0, 0.9f, 0); bodyObstacle.carving = false;
             authority.Register(record);
             int index = pawns.Count;
             var visual = CharacterVisual.Attach(actor.transform, CharacterProfile.MannequinFor(index));
@@ -136,9 +185,13 @@ namespace NightSupermarket.Game
             for (int i = 0; i < pawns.Count; i++) if (pawns[i].Motor.Record.Id == id) return pawns[i].Inventory;
             return null;
         }
+        /// <summary>
+        /// Authoritative simulation step: player commands, detection, guard AI, and the match clock. Only the
+        /// state authority runs it; remote clients will receive the results instead (see networking.md).
+        /// </summary>
         private void FixedUpdate()
         {
-            if (authority == null || pawns.Count == 0) return;
+            if (authority == null || pawns.Count == 0 || !network.IsAuthority) return;
             float delta = Time.fixedDeltaTime;
             var motors = new PlayerMotor[pawns.Count];
             var vision = new DetectionSystem[pawns.Count];
@@ -185,6 +238,21 @@ namespace NightSupermarket.Game
             RefreshSurveillance();
             authority.Tick(delta);
         }
+        private readonly List<EntitySighting> entities = new List<EntitySighting>();
+        /// <summary>Camera view of everyone: mannequins, shoppers, staff, and the guard. Positions only.</summary>
+        private List<EntitySighting> Entities(List<PlayerSighting> players, Vector3 guardPosition)
+        {
+            entities.Clear();
+            foreach (var player in players) entities.Add(new EntitySighting(player.Id, EntityKind.Mannequin, player.Position));
+            if (population != null)
+                foreach (var npc in population.Active)
+                {
+                    Vector3 p = npc.transform.position;
+                    entities.Add(new EntitySighting(npc.name, npc.Role == NpcRole.Employee ? EntityKind.Employee : EntityKind.Customer, new MapPoint(p.x, p.y, p.z)));
+                }
+            entities.Add(new EntitySighting("guard", EntityKind.Guard, new MapPoint(guardPosition.x, guardPosition.y, guardPosition.z)));
+            return entities;
+        }
         private void RefreshSurveillance()
         {
             var players = new List<PlayerSighting>(pawns.Count);
@@ -207,6 +275,7 @@ namespace NightSupermarket.Game
             authority.Surveillance.ReportGuard(guardController.Brain.State, new MapPoint(guardPosition.x, guardPosition.y, guardPosition.z));
             authority.Surveillance.ReportLighting(authority.Lighting.Mode);
             authority.Surveillance.ReportPlayers(players);
+            authority.Surveillance.ReportEntities(Entities(players, guardPosition));
             authority.Surveillance.ReportDoors(doorFacts);
             authority.Surveillance.ReportObjectives(objectives);
         }
@@ -214,19 +283,68 @@ namespace NightSupermarket.Game
         {
             var keyboard = Keyboard.current;
             if (keyboard == null || authority == null) return;
-            if (keyboard.escapeKey.wasPressedThisFrame) Cursor.lockState = CursorLockMode.None;
-            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && authority.Flow.Phase == MatchPhase.Night)
-                Cursor.lockState = CursorLockMode.Locked;
-            controls.Poll(keyboard);
-            testing.Poll(keyboard);
-            if (hud != null) hud.Show(BuildStatus(), BuildPrompt(), HudText.Help(help, controls, testing));
+            if (keyboard.tabKey.wasPressedThisFrame) ToggleMenu(help ? (MenuPage?)null : MenuPage.Night);
+            else if (keyboard.escapeKey.wasPressedThisFrame)
+            {
+                if (help) ToggleMenu(null);
+                else Cursor.lockState = CursorLockMode.None;
+            }
+            if (help)
+            {
+                if (keyboard.digit1Key.wasPressedThisFrame) menuPage = MenuPage.Night;
+                if (keyboard.digit2Key.wasPressedThisFrame) menuPage = MenuPage.Missions;
+                if (keyboard.digit3Key.wasPressedThisFrame) menuPage = MenuPage.Inventory;
+                if (keyboard.digit4Key.wasPressedThisFrame) menuPage = MenuPage.Reports;
+                if (keyboard.digit5Key.wasPressedThisFrame || keyboard.vKey.wasPressedThisFrame) menuPage = MenuPage.Cameras;
+                if (keyboard.digit6Key.wasPressedThisFrame || keyboard.hKey.wasPressedThisFrame) menuPage = MenuPage.Controls;
+            }
+            else
+            {
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && authority.Flow.Phase == MatchPhase.Night)
+                    Cursor.lockState = CursorLockMode.Locked;
+                controls.Poll(keyboard);
+                testing.Poll(keyboard);
+            }
+            if (hud != null)
+            {
+                FillHud();
+                hud.Show(hudModel);
+            }
+        }
+        private void ToggleMenu(MenuPage? page)
+        {
+            bool open = !help;
+            if (page.HasValue) { menuPage = page.Value; open = true; }
+            if (open == help && !page.HasValue) return;
+            help = open;
+            if (open)
+            {
+                timeScaleBeforeMenu = Time.timeScale <= 0.01f ? 1f : Time.timeScale;
+                clockPausedBeforeMenu = authority.Clock.Paused;
+                Time.timeScale = 0f;
+                authority.Clock.Paused = true;
+                Cursor.lockState = CursorLockMode.None;
+            }
+            else
+            {
+                Time.timeScale = timeScaleBeforeMenu;
+                authority.Clock.Paused = clockPausedBeforeMenu;
+                if (authority.Flow.Phase == MatchPhase.Night) Cursor.lockState = CursorLockMode.Locked;
+            }
+        }
+        private void OpenCameras()
+        {
+            ToggleMenu(MenuPage.Cameras);
+            if (Player == null) return;
+            string id = Player.Record.Id;
+            if (Player.Record.State == PlayerState.Captured) authority.TryEnterSurveillance(id, id);
         }
         private void ToggleSurveillance()
         {
             if (Player == null) return;
-            string id = Player.Record.Id;
-            if (Player.Record.State == PlayerState.Captured) authority.TryEnterSurveillance(id, id);
-            else if (Player.Record.State == PlayerState.Surveillance) authority.TryLeaveSurveillance(id, id);
+            if (Player.Record.State == PlayerState.Surveillance)
+                authority.TryLeaveSurveillance(Player.Record.Id, Player.Record.Id);
+            else OpenCameras();
         }
         private void RescueFromDebug()
         {
@@ -313,16 +431,100 @@ namespace NightSupermarket.Game
         {
             if (active == pawns.Count) return HudText.GuardStatus(authority, guardController.Brain.State);
             var pawn = pawns[active];
+            var target = pawn.Motor.GetComponent<PerceptionTarget>();
+            var crowd = population != null && target != null ? population.StrongestAwarenessOf(target) : AwarenessState.Unaware;
             return HudText.MannequinStatus(authority, active + 1, pawn.Motor.Record,
-                pawn.Detection != null ? pawn.Detection.Detection : null, missions != null ? missions.Missions : null, pawn.Inventory);
+                pawn.Detection != null ? pawn.Detection.Detection : null, missions != null ? missions.Missions : null, pawn.Inventory, crowd)
+                + (fusion != null ? "\nPhoton " + fusion.Status : "");
         }
         private string BuildPrompt()
         {
+            if (help) return "";
             if (Cursor.lockState != CursorLockMode.Locked && authority.Flow.Phase == MatchPhase.Night) return "Click to play";
             if (active == pawns.Count) return "";
             var pawn = pawns[active];
-            if (pawn.Motor.Record.State == PlayerState.Captured) return "Captured. V to watch the cameras. A teammate can free you at the release panel.";
+            if (pawn.Motor.Record.State == PlayerState.Captured) return "Captured. V opens the cameras. A teammate can free you at the warehouse panel.";
+            if (pawn.Motor.Record.State == PlayerState.Surveillance) return "Watching the live cameras. Tab opens the map. A teammate can free you at the warehouse panel.";
             return pawn.Probe.Prompt;
+        }
+        private void OnReport(SuspiciousActivityEvent report)
+        {
+            reportLog.Add(report);
+            if (reportLog.Count > 8) reportLog.RemoveAt(0);
+            reportToast = HudText.ReportLine(report);
+            reportToastUntil = Time.unscaledTime + 4.5f;
+        }
+        private void FillHud()
+        {
+            hudModel.ClearLists();
+            hudModel.MenuOpen = help;
+            hudModel.Page = menuPage;
+            hudModel.Clock = HudText.Clock(authority);
+            hudModel.Paused = authority.Clock.Paused;
+            hudModel.Phase = authority.Flow.Phase.ToString();
+            hudModel.Prompt = BuildPrompt();
+            hudModel.Toast = Time.unscaledTime < reportToastUntil ? reportToast : "";
+            hudModel.Reports = reportLog.Count;
+            hudModel.CameraNote = "This is the store map. Live dots appear after you are captured.";
+            hudModel.LiveCameras = false;
+            if (active == pawns.Count)
+            {
+                hudModel.Role = "Guard";
+                hudModel.BodyState = guardController.Brain.State.ToString();
+                hudModel.Detection = "—";
+                hudModel.DetectionTint = "#9FB3C8";
+                hudModel.Crowd = "Watching the floor";
+                hudModel.CrowdTint = "#9FB3C8";
+            }
+            else
+            {
+                var pawn = pawns[active];
+                var target = pawn.Motor.GetComponent<PerceptionTarget>();
+                var crowd = population != null && target != null ? population.StrongestAwarenessOf(target) : AwarenessState.Unaware;
+                hudModel.Role = "Mannequin " + (active + 1);
+                hudModel.BodyState = pawn.Motor.Record.State.ToString();
+                if (pawn.Detection != null)
+                {
+                    hudModel.Detection = pawn.Detection.Detection.State.ToString().ToUpperInvariant();
+                    hudModel.DetectionTint = HudText.DetectionColor(pawn.Detection.Detection.State);
+                }
+                else { hudModel.Detection = "CLEAR"; hudModel.DetectionTint = "#7CE38B"; }
+                hudModel.Crowd = HudText.CrowdPlain(crowd);
+                hudModel.CrowdTint = HudText.CrowdTint(crowd);
+                if (missions != null)
+                    foreach (var mission in missions.Missions)
+                        hudModel.Missions.Add(new HudLine(mission.Rule.Title, mission.Progress + " / " + mission.Rule.Quantity, null, mission.Complete, mission.Failed));
+                if (pawn.Inventory != null)
+                {
+                    hudModel.SlotsUsed = pawn.Inventory.Items.UsedSlots;
+                    hudModel.SlotsMax = pawn.Inventory.Items.Capacity;
+                    foreach (var pair in pawn.Inventory.Items.Snapshot())
+                        hudModel.Items.Add(new HudLine(HudText.ItemLabel(pair.Key), "x" + pair.Value));
+                }
+                bool live = pawn.Motor.Record.State == PlayerState.Captured || pawn.Motor.Record.State == PlayerState.Surveillance;
+                if (live && authority.TryReadSurveillance(pawn.Motor.Record.Id, pawn.Motor.Record.Id, out var view))
+                {
+                    hudModel.LiveCameras = true;
+                    hudModel.CameraNote = "Live security feed. White is a mannequin. Gold is a shopper. Red is the guard.";
+                    foreach (var entity in view.Entities)
+                    {
+                        string tint = entity.Kind == EntityKind.Guard ? "#FF4B4B" : entity.Kind == EntityKind.Customer ? "#F4C15D"
+                            : entity.Kind == EntityKind.Employee ? "#B07CFF" : "#F4EFE6";
+                        hudModel.Marks.Add(new MapMark(entity.Position.X, entity.Position.Z, tint));
+                    }
+                    foreach (var alert in view.Alerts)
+                        hudModel.Marks.Add(new MapMark(alert.LastKnownPosition.X, alert.LastKnownPosition.Z, "#FFE27A", "report"));
+                }
+            }
+            for (int i = 0; i < reportLog.Count; i++)
+            {
+                var report = reportLog[reportLog.Count - 1 - i];
+                hudModel.ReportLines.Add(new HudLine(HudText.ReportLine(report), "Last seen near " + HudText.ZoneLabel(report.Zone)));
+            }
+            foreach (var entry in controls.Entries)
+                hudModel.Controls.Add(new HudLine(entry.Label, entry.Description));
+            foreach (var entry in testing.Entries)
+                hudModel.Testing.Add(new HudLine(entry.Label, entry.Description));
         }
         /// <summary>Letters and numbers only: Mac keyboards send F1-F12 as media keys and lack Home/End/Delete.</summary>
         private void BuildKeyMaps()
@@ -330,12 +532,14 @@ namespace NightSupermarket.Game
             controls = new KeyCommandMap("CONTROLS")
                 .Describe("WASD", "move").Describe("Mouse", "look").Describe("Shift", "run").Describe("Space", "jump")
                 .Describe("E", "use / pick up").Describe("G / Q", "drop / throw")
-                .Bind(Key.Tab, "switch mannequin / guard", () => SetActive((active + 1) % (pawns.Count + 1)))
-                .Bind(Key.V, "security cameras (captured)", ToggleSurveillance)
+                .Describe("Tab", "open the briefing menu")
+                .Bind(Key.V, "cameras and store map", OpenCameras)
+                .Bind(Key.H, "open controls", () => ToggleMenu(MenuPage.Controls))
                 .Bind(Key.T, "guard flashlight", ToggleFlashlight)
-                .Describe("Esc", "free the mouse");
+                .Describe("Esc", "close menu / free the mouse");
             testing = new KeyCommandMap("TESTING")
-                .Bind(Key.H, "show / hide controls", () => help = !help)
+                .Bind(Key.LeftBracket, "previous mannequin", () => SetActive((active + pawns.Count) % (pawns.Count + 1)), "[")
+                .Bind(Key.RightBracket, "next mannequin / guard", () => SetActive((active + 1) % (pawns.Count + 1)), "]")
                 .Bind(Key.C, "capture me", CaptureActive)
                 .Bind(Key.R, "rescue captured players", RescueFromDebug)
                 .Bind(Key.M, "complete all missions", () => ForEachMission(m => m.DebugComplete()))
@@ -347,6 +551,9 @@ namespace NightSupermarket.Game
                 .Bind(Key.L, "next lighting mode", CycleLighting)
                 .Bind(Key.B, "next guard state", CycleGuard)
                 .Bind(Key.O, "show guard vision", () => guardController.DebugVision = !guardController.DebugVision)
+                .Bind(Key.Z, "NPC debug labels", () => npcDebug.Labels = !npcDebug.Labels)
+                .Bind(Key.X, "NPC perception debug", () => npcDebug.Perception = !npcDebug.Perception)
+                .Bind(Key.Y, "NPC navigation debug", () => npcDebug.Navigation = !npcDebug.Navigation)
                 .Bind(Key.Digit1, "spawn a crate", SpawnCrate)
                 .Bind(Key.Digit8, "skip to dawn", () => authority.DebugAdvance(authority.Clock.Remaining))
                 .Bind(Key.Digit9, "force victory", () => authority.DebugForce(MatchPhase.Victory))
@@ -379,6 +586,8 @@ namespace NightSupermarket.Game
         private void OnDestroy()
         {
             missions?.Dispose(); audioSubscription?.Dispose(); actionSubscription?.Dispose(); noiseSubscription?.Dispose();
+            reportSubscription?.Dispose();
+            Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.None;
         }
         private sealed class Pawn
@@ -404,7 +613,7 @@ namespace NightSupermarket.Game
                 LightingMode.Emergency => new Color(0.35f, 0.05f, 0.05f),
                 LightingMode.Partial => new Color(0.12f, 0.12f, 0.1f),
                 LightingMode.Dawn => new Color(0.75f, 0.55f, 0.38f),
-                _ => new Color(0.35f, 0.35f, 0.4f)
+                _ => new Color(0.48f, 0.47f, 0.42f)
             };
         }
     }

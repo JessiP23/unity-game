@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: PlaceCrate
   m_EditorClassIdentifier: 
   id: place-crate
-  title: Place a crate in the green clothing zone
+  title: Place a crate on the Clothing drop rug
   targetTag: object
   destination: clothing
   requiredItem: 

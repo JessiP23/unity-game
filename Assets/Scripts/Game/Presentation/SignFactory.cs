@@ -37,10 +37,14 @@ namespace NightSupermarket.Game
             return sign;
         }
 
-        private static void Text(Transform sign, string text, Vector3 position, float yaw, float letterHeight, Color ink)
+        /// <summary>Depth-tested world label, e.g. for debug overlays.</summary>
+        public static TextMesh Label(Transform parent, string text, float letterHeight, Color ink) =>
+            Text(parent, text, Vector3.zero, 0, letterHeight, ink);
+
+        private static TextMesh Text(Transform sign, string text, Vector3 position, float yaw, float letterHeight, Color ink)
         {
             if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (font == null) return;
+            if (font == null) return null;
             if (textMaterial == null)
             {
                 var template = Resources.Load<Material>("Materials/WorldText");
@@ -58,6 +62,7 @@ namespace NightSupermarket.Game
             mesh.anchor = TextAnchor.MiddleCenter; mesh.alignment = TextAlignment.Center;
             mesh.color = ink;
             label.GetComponent<MeshRenderer>().sharedMaterial = textMaterial;
+            return mesh;
         }
     }
 }

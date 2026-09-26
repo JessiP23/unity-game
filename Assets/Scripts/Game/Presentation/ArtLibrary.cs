@@ -42,6 +42,15 @@ namespace NightSupermarket.Game
             material.SetColor("_EmissionColor", color * intensity);
             return Materials[key] = material;
         }
+        public static Material Glass(Color tint)
+        {
+            string key = $"glass:{tint}";
+            if (Materials.TryGetValue(key, out var cached)) return cached;
+            var material = NewTransparent(tint.a);
+            material.SetColor("_BaseColor", tint);
+            material.SetFloat("_Smoothness", 0.95f);
+            return Materials[key] = material;
+        }
         /// <summary>Tiling surface from Resources/Art/Surfaces. Returns null when the texture was not fetched.</summary>
         public static Material Surface(string id, Vector2 tiling, Color tint, float smoothness)
         {
@@ -135,8 +144,16 @@ namespace NightSupermarket.Game
                 material.SetColor("_BaseColor", new Color(1, 1, 1, 0));
                 return Materials[key] = material;
             }
-            material = NewOpaque();
             string folder = $"Art/Characters/{character}/textures/{materialName}";
+            if (materialName.EndsWith("_opacity"))
+            {
+                material = NewCutout();
+                var hair = Texture(folder + "_color");
+                if (hair != null) material.SetTexture("_BaseMap", hair);
+                material.SetFloat("_Smoothness", 0.25f);
+                return Materials[key] = material;
+            }
+            material = NewOpaque();
             var normal = Texture(folder + "_normal");
             if (plastic)
             {
@@ -162,6 +179,17 @@ namespace NightSupermarket.Game
             if (opaque == null) opaque = Resources.Load<Material>("Materials/LitOpaque");
             var material = opaque != null ? new Material(opaque) : new Material(Shader.Find("Universal Render Pipeline/Lit"));
             material.DisableKeyword("_EMISSION");
+            return material;
+        }
+        private static Material cutout;
+        private static Material NewCutout()
+        {
+            if (cutout == null) cutout = Resources.Load<Material>("Materials/LitCutout");
+            if (cutout != null) return new Material(cutout);
+            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            material.SetFloat("_AlphaClip", 1); material.SetFloat("_Cutoff", 0.5f); material.SetFloat("_Cull", 0);
+            material.EnableKeyword("_ALPHATEST_ON");
+            material.renderQueue = (int)RenderQueue.AlphaTest;
             return material;
         }
         private static Material NewTransparent(float alpha)

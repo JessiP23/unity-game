@@ -15,11 +15,13 @@ Presentation is replaceable. `PoseMap` exposes the pose an animator would play. 
 | Folder | Contents |
 | --- | --- |
 | `Player/` | `PlayerMotor` (fixed-step movement with acceleration), `PlayerView` (first-person camera), input, carry, inventory, interaction |
-| `Guard/` | `GuardController` (NavMesh body, smooth turning, chase speed), vision, flashlight |
+| `Guard/` | `GuardController` (NavMesh body, smooth turning, chase speed, investigates noises and civilian reports), vision, flashlight |
+| `Perception/` | `VisionSensor` (shared eyes for guard, customers, staff), `PerceptionTarget` (what observers can notice) |
+| `Npc/` | Customers and staff by composition; see [NPCs](npcs.md) |
 | `Items/` | Physical items (carve the NavMesh while resting), doors, rescue and escape interactables |
 | `Missions/` | Mission definitions and the tracker bridge |
 | `Presentation/` | Reusable visual building blocks, listed below |
-| `UI/` | `PrototypeHud` layout, `HudText` formatting, `KeyCommandMap` |
+| `UI/` | Compact HUD, Tab briefing menu, `HudText` copy, `KeyCommandMap` |
 
 Reusable presentation pieces, none of which feed gameplay:
 - `MotionInterpolator` blends the last two fixed-step poses, so cameras and bodies render smoothly at any frame rate.
@@ -31,4 +33,6 @@ Reusable presentation pieces, none of which feed gameplay:
 
 `KeyCommandMap` binds keys and documents them in one place, so the on-screen help can't drift from the input the game actually polls.
 
-The local prototype runs two mannequin identities in one process. Tab changes which identity receives input. That is a test control scheme, not a second ruleset.
+Customers and staff are described in [NPCs](npcs.md). They share the guard's `VisionSensor` but interpret sightings with their own `AwarenessTracker`, and they report to security through `LocalMatchAuthority.TryReport` instead of capturing.
+
+The local prototype runs four mannequin identities in one process. `[` / `]` change which identity receives input. That is a test control scheme, not a second ruleset. Tab opens the briefing menu.

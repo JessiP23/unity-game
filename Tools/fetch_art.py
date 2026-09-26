@@ -37,23 +37,42 @@ PROPS = [
     'industrial_wall_lamp', 'rollershutter_door', 'trashbag', 'plastic_broom', 'ladder_sectioned_01',
     'metal_office_desk', 'television_02', 'metal_stool_03', 'power_box_01', 'utility_box_01',
     'modular_airduct_rectangular_01', 'vintage_flashlight', 'clipboard',
+    # Electronics department
+    'Television_01', 'gaming_console', 'gamepad', 'boombox', 'classic_laptop', 'cassette_player',
+    'portable_cassette_player', 'vintage_video_camera',
+    # Home department
+    'sofa_02', 'ArmChair_01', 'modern_arm_chair_01', 'coffee_table_round_01', 'side_table_01',
+    'drawer_cabinet', 'ceramic_vase_01', 'ceramic_vase_02', 'ceramic_vase_03', 'standing_picture_frame_01',
+    'mantel_clock_01', 'desk_lamp_arm_01', 'throw_pillows_01', 'Ottoman_01', 'dining_chair_02',
+    # Clothing department
+    'rubber_boots', 'fishermans_hat', 'wicker_basket_02',
 ]
 SURFACES = {
     'tiled_floor_001': '2k', 'smooth_concrete_floor': '1k', 'white_plaster_02': '1k',
     'concrete_block_wall_02': '1k', 'ceiling_interior': '1k', 'blue_metal_plate': '1k',
 'brushed_concrete': '1k', 'wood_table_001': '1k',
     'rusty_metal_shutter': '1k', 'concrete_wall_004': '1k',
+    'cotton_jersey': '1k', 'rough_linen': '1k', 'ribbed_corduroy': '1k', 'wool_boucle': '1k',
 }
 AVATARS = {
     'Guard': 'Avatars/Professions/Security_Male_01',
     'MannequinMale': 'Avatars/Adults/Male_Adult_08',
     'MannequinFemale': 'Avatars/Adults/Female_Adult_01',
+    'CustomerA': 'Avatars/Adults/Male_Adult_02',
+    'CustomerB': 'Avatars/Adults/Female_Adult_03',
+    'CustomerC': 'Avatars/Adults/Male_Adult_05',
+    'CustomerD': 'Avatars/Adults/Female_Adult_05',
+    'CustomerE': 'Avatars/Professions/Business_Male_02',
+    'CustomerF': 'Avatars/Adults/Female_Adult_09',
+    'Employee': 'Avatars/Professions/Delivery_Male_01',
 }
+# NPCs are seen at a distance; smaller textures keep the repository lean.
+REDUCED = {'CustomerA', 'CustomerB', 'CustomerC', 'CustomerD', 'CustomerE', 'CustomerF', 'Employee'}
 STATIC = 'Animations/all_animations_max_motextr_static/'
 MOVING = 'Animations/all_animations_max_motextr_xy/'
 ANIMATIONS = [
     STATIC + 'm_idle_neutral_01.max.fbx', STATIC + 'm_idle_look_around_01.max.fbx',
-    STATIC + 'f_idle_neutral_01.max.fbx',
+    STATIC + 'f_idle_neutral_01.max.fbx', STATIC + 'f_idle_look_around_01.max.fbx',
     MOVING + 'm_walk_neutral_01.max.fbx', MOVING + 'm_walk_slow_01.max.fbx', MOVING + 'm_run_neutral_01.max.fbx',
     MOVING + 'f_walk_neutral_01.max.fbx', MOVING + 'f_run_neutral_01.max.fbx',
 ]
@@ -122,9 +141,12 @@ def surface(asset, size):
         if url:
             fetch(url, folder / f'{asset}_{suffix}.jpg')
 
-def tga_to_jpg(source, target):
-    subprocess.run(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '88', str(source), '--out', str(target)],
-                   check=True, stdout=subprocess.DEVNULL)
+def convert(source, target, max_size=None):
+    fmt = ['png'] if target.suffix == '.png' else ['jpeg', '-s', 'formatOptions', '88']
+    command = ['sips', '-s', 'format', *fmt, str(source), '--out', str(target)]
+    if max_size:
+        command[1:1] = ['-Z', str(max_size)]
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
 
 def avatar(name, path):
     folder = ART / 'Characters' / name
@@ -137,13 +159,14 @@ def avatar(name, path):
             stem = Path(texture).stem
             if not (stem.endswith('_color') or stem.endswith('_normal')):
                 continue
-            target = folder / 'textures' / (stem + '.jpg')
+            # Hair and eyelash cards need their alpha channel.
+            target = folder / 'textures' / (stem + ('.png' if '_opacity' in stem else '.jpg'))
             if target.exists():
                 continue
             raw = Path(scratch) / texture
             fetch(ROCKETBOX + f'{path}/Textures/{texture}', raw)
             target.parent.mkdir(parents=True, exist_ok=True)
-            tga_to_jpg(raw, target)
+            convert(raw, target, 1024 if name in REDUCED else None)
 
 def animation(path):
     name = path.rsplit('/', 1)[1].replace('.max.fbx', '.fbx')

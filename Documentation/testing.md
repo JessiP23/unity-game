@@ -53,3 +53,17 @@ EditMode 41 passed and PlayMode 7 passed, zero failed or skipped. New coverage: 
 Push, player-driven guard movement, and staged vision now have PlayMode coverage. Out-of-range and out-of-FOV checks must leave the line-test count at zero. A reachable push must change horizontal velocity; a far, non-pushable, or captured push must not.
 
 Not run: an online Fusion session, PlayFab, a Unity profiler capture, or the Windows executable on this Mac. Photon and PlayFab downloads require accounts this environment cannot sign into.
+
+## Customers and staff
+
+EditMode 60 passed and PlayMode 16 passed (plus the on-demand screenshot capture), zero failed. New coverage:
+
+- Awareness: a still mannequin never builds suspicion; movement registers only after the notice time and only while visible; suspicion decays; freezing early calms the observer; the report fires once after reaction and delay and keeps the last-seen position; threshold and sensitivity are configurable.
+- Customer brain: a full visit (enter, shop two departments, checkout, leave), destinations follow the list, unreachable departments are skipped, alerts stop shopping, reporting customers stand still and never chase, and shrugging it off resumes shopping.
+- Lists and zones: routes vary between customers and follow preferences, each department is visited once, and customers cannot enter warehouse, employee, or security zones.
+- Authority: accepted reports reach the guard stream and the security cameras, reports outside the night are ignored, cameras list entities without awareness, and the night grade.
+- PlayMode: a customer spawns, shops, pays, leaves, and is recycled from the pool; customer paths into restricted NavMesh areas fail while staff paths succeed; walls, FOV, and range each block perception (with an in-the-open control); still versus moving mannequins.
+- The clothing-aisle scenario from the design, unscripted: moving behind a browsing customer is safe; freezing in view is only observed; moving in view triggers a report after a delay; the report holds the last-seen spot, not the hiding place; the guard investigates and walks toward that spot; the customer returns to normal.
+- Replication: proxies mirror position, behaviour state, and alert state from authority snapshots, run no pathfinding or perception, never report, and despawn when the authority's NPC leaves.
+
+Not covered: real network transport (Fusion is not installed), and profiling with 20 to 50 customers.

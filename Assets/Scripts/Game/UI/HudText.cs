@@ -18,6 +18,9 @@ namespace NightSupermarket.Game
             if (authority.Clock.Paused) Builder.Append("  <color=").Append(Accent).Append(">PAUSED</color>");
             if (authority.Flow.Phase != MatchPhase.Night)
                 Builder.Append("  <color=").Append(Accent).Append('>').Append(authority.Flow.Phase.ToString().ToUpperInvariant()).Append("</color>");
+            if (authority.Flow.Phase == MatchPhase.Victory || authority.Flow.Phase == MatchPhase.Defeat)
+                Builder.Append("\n<b>Night grade ").Append(authority.Stats.Grade(authority.Flow.Phase == MatchPhase.Victory, authority.Clock.Remaining))
+                       .Append("</b>   reports ").Append(authority.Stats.Reports).Append("   captures ").Append(authority.Stats.Captures);
             return Builder.ToString();
         }
 
@@ -25,7 +28,7 @@ namespace NightSupermarket.Game
             Header(authority) + "\nYou are the <b>GUARD</b>   state " + state + "\n<size=16>Same eyes and ears as the AI guard.</size>";
 
         public static string MannequinStatus(LocalMatchAuthority authority, int playerNumber, PlayerRecord record,
-            DetectionSystem detection, IReadOnlyList<MissionTracker> missions, PlayerInventory inventory)
+            DetectionSystem detection, IReadOnlyList<MissionTracker> missions, PlayerInventory inventory, AwarenessState crowd = AwarenessState.Unaware)
         {
             string header = Header(authority);
             Builder.Clear();
@@ -34,6 +37,7 @@ namespace NightSupermarket.Game
             if (detection != null)
                 Builder.Append("Seen <color=").Append(DetectionColor(detection.State)).Append('>').Append(detection.State.ToString().ToUpperInvariant())
                        .Append("</color>   suspicion ").Append(detection.Suspicion.Value).Append('\n');
+            Builder.Append("People ").Append(CrowdLabel(crowd)).Append('\n');
             if (missions != null)
                 foreach (var mission in missions)
                 {
@@ -59,10 +63,46 @@ namespace NightSupermarket.Game
             return Builder.ToString();
         }
 
+        public static string ZoneLabel(ZoneType? zone) => zone switch
+        {
+            ZoneType.EntranceExit => "Entrance",
+            ZoneType.Checkout => "Checkout",
+            ZoneType.Supermarket => "the aisles",
+            ZoneType.Clothing => "Clothing",
+            ZoneType.Electronics => "Electronics",
+            ZoneType.Home => "Home",
+            ZoneType.CustomerService => "Customer Service",
+            ZoneType.Warehouse => "the warehouse",
+            ZoneType.Employee => "the staff room",
+            ZoneType.Security => "Security",
+            _ => "the store"
+        };
+
+        public static string ItemLabel(string id) => id switch
+        {
+            "shirt" => "Shirt",
+            "employee-key" => "Employee key",
+            "debug-crate" => "Crate",
+            _ => string.IsNullOrEmpty(id) ? "Item" : id.Replace('-', ' ')
+        };
+
+        public static string ReportLine(SuspiciousActivityEvent report)
+        {
+            string who = report.SourceId != null && report.SourceId.IndexOf("Employee", System.StringComparison.OrdinalIgnoreCase) >= 0
+                ? "A staff member" : "A shopper";
+            return who + " reported movement near " + ZoneLabel(report.Zone);
+        }
+
+        public static string Clock(LocalMatchAuthority authority)
+        {
+            int seconds = Mathf.CeilToInt((float)authority.Clock.Remaining);
+            return (seconds / 60) + ":" + (seconds % 60).ToString("00");
+        }
+
         /// <summary>Lines of "key\taction"; a blank line separates maps so the HUD can lay them side by side.</summary>
         public static string Help(bool expanded, params KeyCommandMap[] maps)
         {
-            if (!expanded) return "<b><color=" + Accent + ">H</color></b>  controls";
+            if (!expanded) return "<b><color=" + Accent + ">TAB</color></b>  menu   <color=" + Accent + ">H</color>  controls";
             Builder.Clear();
             for (int m = 0; m < maps.Length; m++)
             {
@@ -75,6 +115,25 @@ namespace NightSupermarket.Game
             return Builder.ToString();
         }
 
+        /// <summary>Customer reactions as the player would read them: no numbers, just body language.</summary>
+        public static string CrowdLabel(AwarenessState state) =>
+            "<color=" + CrowdTint(state) + ">" + CrowdPlain(state) + "</color>";
+
+        public static string CrowdPlain(AwarenessState state) => state switch
+        {
+            AwarenessState.Observing => "WATCHING YOU",
+            AwarenessState.Suspicious => "SUSPICIOUS",
+            AwarenessState.Reporting => "CALLING GUARD",
+            _ => "CALM"
+        };
+
+        public static string CrowdTint(AwarenessState state) => state switch
+        {
+            AwarenessState.Observing => "#FFD54A",
+            AwarenessState.Suspicious => "#FF9F45",
+            AwarenessState.Reporting => "#FF6B5E",
+            _ => "#9FB3C8"
+        };
         public static string DetectionColor(DetectionState state) => state switch
         {
             DetectionState.Green => "#7CE38B",

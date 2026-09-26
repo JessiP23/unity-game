@@ -8,6 +8,8 @@
     "Unity.RenderPipelines.Core.Runtime",
     "Unity.RenderPipelines.Core.Editor",
     "NightSupermarket.Core",
-    "NightSupermarket.Game"
+    "NightSupermarket.Game",
+    "Fusion.Unity",
+    "Fusion.Unity.Editor"
   ]
 }

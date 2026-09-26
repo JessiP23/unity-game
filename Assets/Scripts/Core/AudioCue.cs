@@ -4,6 +4,6 @@ namespace NightSupermarket.Core
     public enum AudioCue
     {
         DetectionWarning, DetectionRed, SuspicionIncreased, Discovery, Capture, Rescue,
-        MissionComplete, Footstep, Impact, Break, Door, Escape, Dawn, Victory, Defeat
+        MissionComplete, Footstep, Impact, Break, Door, Escape, Dawn, Victory, Defeat, CustomerReport
     }
 }

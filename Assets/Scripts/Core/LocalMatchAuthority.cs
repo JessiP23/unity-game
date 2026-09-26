@@ -18,6 +18,9 @@ namespace NightSupermarket.Core
         public SurveillanceBoard Surveillance { get; } = new SurveillanceBoard();
         public LightingState Lighting { get; } = new LightingState();
         public EventStream<AudioCue> Audio { get; } = new EventStream<AudioCue>();
+        public NightStats Stats { get; } = new NightStats();
+        /// <summary>Accepted civilian reports. Security listens here; clients only ever see accepted reports.</summary>
+        public EventStream<SuspiciousActivityEvent> Reports { get; } = new EventStream<SuspiciousActivityEvent>();
         public Func<bool> MissionsComplete { get; set; }
         private readonly List<PlayerRecord> players = new List<PlayerRecord>();
         public LocalMatchAuthority(GameRules rules, IPlayerSession session)
@@ -48,6 +51,7 @@ namespace NightSupermarket.Core
         {
             var player = Find(playerId);
             if (!CaptureService.TryCapture(Flow.Phase, player, Warehouse)) return false;
+            Stats.RecordCapture();
             Audio.Publish(AudioCue.Capture);
             ApplyOutcome();
             return true;
@@ -64,10 +68,21 @@ namespace NightSupermarket.Core
                 var captive = Find(ids[i]);
                 if (!RescueService.TryRescue(Rules, Flow.Phase, rescuer, captive, Warehouse)) continue;
                 released++;
+                Stats.RecordRescue();
                 Audio.Publish(AudioCue.Rescue);
             }
             if (released > 0) ApplyOutcome();
             return released;
+        }
+        /// <summary>Accepts a report raised by an authority-simulated NPC during the night.</summary>
+        public bool TryReport(SuspiciousActivityEvent report)
+        {
+            if (Flow.Phase != MatchPhase.Night || string.IsNullOrEmpty(report.SourceId)) return false;
+            Stats.RecordReport();
+            Surveillance.ReportAlert(report);
+            Audio.Publish(AudioCue.CustomerReport);
+            Reports.Publish(report);
+            return true;
         }
         public bool TryEscape(string connection, string playerId, bool atExit, Inventory inventory, string requiredKey)
         {

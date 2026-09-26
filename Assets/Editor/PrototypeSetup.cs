@@ -23,7 +23,7 @@ namespace NightSupermarket.Editor
                 collect.kind = ActionKind.Collect; collect.quantity = 3;
                 AssetDatabase.CreateAsset(collect, "Assets/Settings/CollectCrates.asset");
                 var place = ScriptableObject.CreateInstance<MissionDefinition>();
-                place.id = "place-crate"; place.title = "Place a crate in the green clothing zone"; place.targetTag = "object";
+                place.id = "place-crate"; place.title = "Place a crate on the Clothing drop rug"; place.targetTag = "object";
                 place.kind = ActionKind.Place; place.quantity = 1; place.destination = "clothing";
                 AssetDatabase.CreateAsset(place, "Assets/Settings/PlaceCrate.asset");
                 rules.missions = new[] { collect, place }; EditorUtility.SetDirty(rules);

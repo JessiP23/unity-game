@@ -22,5 +22,17 @@ namespace NightSupermarket.Game
         public static readonly CharacterProfile MannequinFemale =
             new CharacterProfile("MannequinFemale", Vector3.zero, true, "f_idle_neutral_01", "f_walk_neutral_01", "f_run_neutral_01");
         public static CharacterProfile MannequinFor(int playerIndex) => playerIndex % 2 == 0 ? MannequinMale : MannequinFemale;
+
+        /// <summary>Ordinary person with the Rocketbox clip set that matches their skeleton.</summary>
+        public static CharacterProfile Civilian(string model, bool female) => female
+            ? new CharacterProfile(model, Vector3.zero, false, "f_idle_neutral_01", "f_walk_neutral_01", "f_run_neutral_01")
+            : new CharacterProfile(model, Vector3.zero, false, "m_idle_neutral_01", "m_walk_neutral_01", "m_run_neutral_01");
+        public static readonly CharacterProfile[] Customers =
+        {
+            Civilian("CustomerA", false), Civilian("CustomerB", true), Civilian("CustomerC", false),
+            Civilian("CustomerD", true), Civilian("CustomerE", false), Civilian("CustomerF", true),
+        };
+        public static readonly CharacterProfile Employee =
+            new CharacterProfile("Employee", Vector3.zero, false, "m_idle_look_around_01", "m_walk_neutral_01", "m_run_neutral_01");
     }
 }

@@ -9,5 +9,5 @@ patrol. Physics geometry supplies the runtime NavMesh; actors/items are excluded
 and the door is a carving obstacle. Vision/suspicion remain separate services.
 Discovery capture is performed by the match authority, including when the guard
 has not yet closed to capture distance. The guard's Capture handler then returns
-to patrol. Tab can drive that same guard body; vision and hearing stay on it.
+to patrol. `[` / `]` can drive that same guard body; vision and hearing stay on it.
 The AI brain is not ticked while a player is driving.

@@ -27,7 +27,9 @@ namespace NightSupermarket.Game
         private GameRulesAsset rules;
         private Vector3[] patrol;
         private int waypoint;
-        private IDisposable hearing;
+        private IDisposable hearing, reports;
+        /// <summary>Last report this guard acted on; debug and tests read it.</summary>
+        public SuspiciousActivityEvent? LastReport { get; private set; }
         private GuardVisionSystem vision;
         private bool playerDriven, searching;
         private float cruiseSpeed;
@@ -45,8 +47,35 @@ namespace NightSupermarket.Game
             {
                 if (Vector3.Distance(transform.position, noise.Position) <= config.hearingRadius * noise.Loudness
                     && Brain.State != GuardState.Chase && Brain.State != GuardState.Capture)
-                { LastKnownPosition = noise.Position; Brain.Hear(); }
+                    BeginInvestigation(noise.Position);
             });
+        }
+        /// <summary>
+        /// Civilian reports send the guard to investigate where the mannequin was last seen, the same way
+        /// a noise does. The report never carries the mannequin's current position.
+        /// </summary>
+        public void InvestigateReports(EventStream<SuspiciousActivityEvent> stream)
+        {
+            reports?.Dispose();
+            reports = stream?.Subscribe(report =>
+            {
+                if (Brain == null || Brain.State == GuardState.Chase || Brain.State == GuardState.Capture) return;
+                LastReport = report;
+                BeginInvestigation(new Vector3(report.LastKnownPosition.X, report.LastKnownPosition.Y, report.LastKnownPosition.Z));
+            });
+        }
+        /// <summary>
+        /// Starts walking to a heard or reported spot straight away. Otherwise a guard standing at the end of
+        /// its old path would count as already arrived and search where it stood.
+        /// </summary>
+        private void BeginInvestigation(Vector3 position)
+        {
+            LastKnownPosition = position;
+            Brain.Hear();
+            if (playerDriven || agent == null || !agent.isOnNavMesh) return;
+            if (!NavMesh.SamplePosition(position, out var hit, 3, NavMesh.AllAreas)) return;
+            agent.isStopped = false;
+            agent.SetDestination(hit.position);
         }
         public void TickGroup(IReadOnlyList<PlayerMotor> targets, IReadOnlyList<DetectionSystem> detections, float delta)
         {
@@ -128,6 +157,6 @@ namespace NightSupermarket.Game
             Gizmos.DrawRay(eye, Quaternion.Euler(0, rules.fieldOfView / 2, 0) * transform.forward * rules.visionDistance);
             Gizmos.DrawWireSphere(transform.position, rules.hearingRadius);
         }
-        private void OnDestroy() => hearing?.Dispose();
+        private void OnDestroy() { hearing?.Dispose(); reports?.Dispose(); }
     }
 }

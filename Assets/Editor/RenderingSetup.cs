@@ -39,9 +39,9 @@ namespace NightSupermarket.Editor
             var settings = new SerializedObject(pipeline);
             settings.FindProperty("m_AdditionalLightShadowsSupported").boolValue = true;
             settings.FindProperty("m_SoftShadowsSupported").boolValue = true;
-            settings.FindProperty("m_AdditionalLightsPerObjectLimit").intValue = 8;
-            settings.FindProperty("m_ShadowDistance").floatValue = 35;
-            settings.FindProperty("m_AdditionalLightsShadowmapResolution").intValue = 2048;
+            settings.FindProperty("m_AdditionalLightsPerObjectLimit").intValue = 6;
+            settings.FindProperty("m_ShadowDistance").floatValue = 22;
+            settings.FindProperty("m_AdditionalLightsShadowmapResolution").intValue = 1024;
             var any = settings.FindProperty("m_AnyShadowsSupported");
             if (any != null) any.boolValue = true;
             settings.ApplyModifiedPropertiesWithoutUndo();
@@ -74,6 +74,14 @@ namespace NightSupermarket.Editor
             transparent.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
             transparent.renderQueue = (int)RenderQueue.Transparent;
             Save(transparent, TemplateFolder + "/LitTransparent.mat");
+            var cutout = new Material(lit) { name = "LitCutout" };
+            cutout.SetFloat("_AlphaClip", 1);
+            cutout.SetFloat("_Cutoff", 0.5f);
+            cutout.SetFloat("_Cull", 0);
+            cutout.EnableKeyword("_ALPHATEST_ON");
+            cutout.SetOverrideTag("RenderType", "TransparentCutout");
+            cutout.renderQueue = (int)RenderQueue.AlphaTest;
+            Save(cutout, TemplateFolder + "/LitCutout.mat");
             var text = Shader.Find("NightSupermarket/WorldText");
             if (text != null) Save(new Material(text) { name = "WorldText" }, TemplateFolder + "/WorldText.mat");
         }

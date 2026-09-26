@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee073f2d6f343431fa85c06aad05a9e0, type: 3}
+  m_Name: Customer Nosy neighbour
+  m_EditorClassIdentifier: 
+  walkSpeed: {x: 0.9, y: 1.3}
+  browseSeconds: {x: 3, y: 7}
+  waitSeconds: {x: 1, y: 3}
+  waitChance: 0.35
+  glanceChance: 0.35
+  checkoutSeconds: {x: 3, y: 6}
+  checkoutChance: 0.9
+  items: {x: 1, y: 3}
+  maxVisitSeconds: 420
+  exitTimeoutSeconds: 90
+  hurriedPace: 1.3
+  preferredDepartments:
+  - department: 4
+    weight: 2
+  visionRange: 8.5
+  fieldOfView: 85
+  perceptionInterval: 0.2
+  suspicionSensitivity: {x: 1.2, y: 1.5}
+  suspicionGain: 0.9
+  suspicionDecay: 0.35
+  suspicionThreshold: 1
+  noticeSeconds: {x: 0.25, y: 0.5}
+  reactionSeconds: {x: 0.5, y: 1.0}
+  reportDelaySeconds: {x: 1.5, y: 3}
+  reportingProbability: 0.95
+  leaveAfterReport: 0.5

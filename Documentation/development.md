@@ -19,6 +19,7 @@ python3 Tools/unity.py edit
 python3 Tools/unity.py play
 python3 Tools/unity.py build
 python3 Tools/unity.py open
+python3 Tools/unity.py connect
 ```
 The setup command creates URP renderer/pipeline assets, assigns all Quality
 levels, selects Linear color space and Input System, enables text serialization
@@ -46,9 +47,10 @@ animation, audio, IMGUI, JSON serialization, UI, UIElements and UnityWebRequest.
 Transitive packages are resolved by Unity, with exact resolution recorded in
 `Packages/packages-lock.json` after import. No separate legacy TMP package.
 
-Fusion 2 and PlayFab are still absent. Fusion 2.1.1 expects Unity 6000.3+, which
-is newer than the pinned 6000.0.71f1 Editor, so it was not added. See
-[networking](networking.md). No SDK credentials are stored in the project.
+Fusion 2.0.13 is imported under `Assets/Photon/` from the official unitypackage.
+Physics 2D is enabled only because Fusion's scene manager references it; this
+game stays 3D. Put the Photon App Id in Photon App Settings locally, never in
+git. PlayFab is still absent. See [networking](networking.md).
 
 ## Art
 Free art is downloaded, not hand-copied:
@@ -69,10 +71,11 @@ Gameplay does not depend on art. The primitives keep every collider and rule;
 
 The prototype scene is the local night loop: two mannequins, one guard body,
 collect/place objectives, an employee door, warehouse rescue and an escape door.
-Tab switches mannequins and then the guard. The guard uses the same eyes either
-way. H lists every control and testing key (letters and numbers only, since Mac keyboards send F1-F12 as media keys). This is hot-seat authority, not online multiplayer.
-Photon Fusion 2.0.13 and PlayFab both require account downloads that are not in
-this repo.
+Tab opens the briefing menu (missions, inventory, reports, cameras, controls).
+`[` / `]` switch mannequins and then the guard. The guard uses the same eyes either
+way. H opens the Controls page (letters and numbers only, since Mac keyboards send F1-F12 as media keys). This is hot-seat authority, not online multiplayer.
+Hot-seat `[` / `]` switching is still the local way to try four mannequins. Online
+play needs a Photon App Id in Fusion's Photon App Settings (local only).
 
 ## Conventions
 Small responsibilities; PascalCase types/methods; explicit dependencies; XML

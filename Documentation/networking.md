@@ -13,6 +13,8 @@ Accepted only after checks:
 - escape, when the caller is at the exit, holds any required key, and required missions are complete
 - surveillance read, only for that player's own captured or surveillance state
 
+- civilian reports, only during the night, from NPCs the authority simulates (`TryReport`)
+
 Rejected always:
 
 - `AcceptClientClaim` for escaped, mission complete, not seen, picked up, unlocked or captured
@@ -21,20 +23,34 @@ Clients must not be given a way to call the authority methods directly. A future
 
 `ILobbyService` creates and joins local room ids. `IPlayerDataService` stores profile settings. Neither stores suspicion, inventory, objectives or phase.
 
+## NPCs
+
+Only the authority simulates customers and staff: navigation, perception, suspicion, and reports. Clients apply `NpcSnapshot` (id, role, position, yaw, speed, behaviour state, visible awareness state) through `CustomerPopulationManager.ApplySnapshots`, which creates, moves, and removes proxies and never runs AI. Paths, perception rays, shopping lists, and suspicion values stay on the authority.
+
 ## Photon Fusion
 
-Not integrated. No Fusion type is referenced.
+SDK is imported at `Assets/Photon/` (Fusion 2.0.13 Stable, build 2379). Physics 2D is enabled only because Fusion's scene manager references `PhysicsScene2D`; the game remains 3D.
 
-Fusion 2.0.13 Stable (16 September 2026, build 2379) is the official line that lists Unity 6.0.x support, which matches this pin. Fusion 2.1.3 requires a newer Unity. The 2.0.13 package URL responds with Photon’s sign-in wall (`403 - No Access`). The SDK was not downloaded, and none of its API was written from memory.
+The App Id is stored locally in `.photon-app-id` and written into Photon App Settings by `python3 Tools/unity.py setup`. Both files are gitignored.
 
-When the Unity pin moves to a version Fusion supports, integration should:
+`FusionSession` starts a **Host** session when you press Play in the Editor. The host stays the match authority. Customer/player state is not replicated to remote clients yet.
+
+```sh
+python3 Tools/unity.py setup     # writes the App Id into PhotonAppSettings
+python3 Tools/unity.py connect   # starts a host session and asserts Photon answers
+python3 Tools/unity.py open      # Play: HUD shows Photon CONNECTING / CONNECTED
+```
+
+When Fusion 2.0.13 is installed, connect the existing seams. Do not rewrite Core. Exact steps are in `Documentation/npcs.md` under **Multiplayer limitations**. Summary:
 
 - keep gameplay rules in Core
 - run `LocalMatchAuthority` only on the state authority (host/server)
 - give each mannequin input authority for its own commands
-- replicate accepted state: phase, clock, player state, warehouse, suspicion, inventory, doors, objectives, guard state
+- customers and the AI guard stay authority-spawned; they must not use player slots
+- replicate accepted state: phase, clock, player state, warehouse, suspicion, inventory, doors, objectives, guard state, NPC snapshots
+- each tick: authority `CaptureSnapshots` → replicate list → clients `ApplySnapshots`
 - spawn networked objects on the authority, not from an arbitrary client
-- use Fusion's predicted input and interpolation for movement instead of syncing transforms every frame
+- use Fusion's predicted input and interpolation for mannequin movement
 - store the App Id in Photon App Settings locally, never in git
 
 Until that SDK is compiled in this project, local tests are not evidence of network correctness.

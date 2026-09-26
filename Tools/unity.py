@@ -29,7 +29,7 @@ def check_results(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['setup', 'edit', 'play', 'build', 'prototype', 'open', 'shots'])
+    parser.add_argument('action', choices=['setup', 'edit', 'play', 'build', 'prototype', 'open', 'shots', 'connect'])
     args = parser.parse_args()
     editor = editor_path()
     if editor is None:
@@ -40,7 +40,7 @@ def main():
     output.mkdir(exist_ok=True)
     log = output / (args.action + '.log')
     command = [str(editor), '-batchmode', '-projectPath', str(ROOT), '-logFile', str(log)]
-    if args.action in ('edit', 'play', 'shots'):
+    if args.action in ('edit', 'play', 'shots', 'connect'):
         xml = output / (args.action + '.xml')
         if xml.exists():
             xml.unlink()  # A previous successful run must not mask a failed new run.
@@ -51,6 +51,9 @@ def main():
             os.environ['NS_CAPTURE'] = str(shots)
             command += ['-testFilter', 'VisualCaptureTests']
             print('Screenshots:', shots, flush=True)
+        if args.action == 'connect':
+            command += ['-testFilter', 'FusionConnectionTests']
+            print('Photon connect test', flush=True)
     else:
         method = {'setup': 'ProjectSetup.Configure', 'build': 'ProjectSetup.BuildWindows', 'prototype': 'PrototypeSetup.Create'}[args.action]
         command += ['-quit', '-executeMethod', 'NightSupermarket.Editor.' + method]
@@ -59,7 +62,7 @@ def main():
     if result.returncode:
         print('Unity failed. Inspect ' + str(log), file=sys.stderr)
         return result.returncode
-    if args.action in ('edit', 'play', 'shots'):
+    if args.action in ('edit', 'play', 'shots', 'connect'):
         try:
             check_results(xml)
         except (OSError, ET.ParseError, ValueError) as error:

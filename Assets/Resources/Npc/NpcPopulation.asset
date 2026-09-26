@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac490f0d5c7724eb691d764995bb41ae, type: 3}
+  m_Name: NpcPopulation
+  m_EditorClassIdentifier: 
+  minimumCustomers: 6
+  maximumCustomers: 12
+  maxActiveCustomers: 16
+  initialCustomers: 7
+  spawnInterval: 6
+  crowdCycleSeconds: 180
+  employees: 2
+  employeeWalkSpeed: {x: 1.25, y: 1.45}
+  employeeWorkSeconds: {x: 6, y: 14}
+  employeeVisionRange: 9
+  employeeFieldOfView: 90
+  employeeSensitivity: 1.3
+  employeeNoticeSeconds: 0.25
+  employeeReactionSeconds: 0.8
+  employeeReportDelaySeconds: 1.2
+  profiles:
+  - {fileID: 11400000, guid: d774c060337a34ba383f6db0f069382d, type: 2}
+  - {fileID: 11400000, guid: febb59653569a4d7cb28da57ff15835b, type: 2}
+  - {fileID: 11400000, guid: ba3effb11ff894eac8a2f297344bdd4c, type: 2}
+  - {fileID: 11400000, guid: 9b0a07916d2bf440595bf0cfb35a789d, type: 2}
+  - {fileID: 11400000, guid: 21c62e634f0b44e7b8f75328bf96aa93, type: 2}

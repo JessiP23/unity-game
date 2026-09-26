@@ -34,6 +34,22 @@ namespace NightSupermarket.Game
             Box(parent, "Staff wall right", new Vector3(13f, 1.5f, 5f), new Vector3(4f, 3, 0.3f), staff);
             Box(parent, "Staff wall west", new Vector3(8f, 1.5f, 10f), new Vector3(0.3f, 3, 10f), staff);
             Box(parent, "Staff wall lintel", new Vector3(10f, 2.8f, 5f), new Vector3(2f, 0.4f, 0.3f), staff);
+            BuildDepartments(parent, fixture);
+        }
+        /// <summary>Gameplay fixtures for the non-food departments; dressing supplies their look.</summary>
+        private static void BuildDepartments(Transform parent, Color fixture)
+        {
+            Box(parent, "Clothing rack", new Vector3(-6.2f, 0.75f, 11.2f), new Vector3(1.8f, 1.5f, 0.45f), fixture);
+            Box(parent, "Clothing rack", new Vector3(-2.4f, 0.75f, 11.2f), new Vector3(1.8f, 1.5f, 0.45f), fixture);
+            Box(parent, "Clothing table", new Vector3(-6.2f, 0.45f, 9.0f), new Vector3(1.6f, 0.9f, 0.8f), fixture);
+            Box(parent, "Clothing table", new Vector3(-2.4f, 0.45f, 9.0f), new Vector3(1.6f, 0.9f, 0.8f), fixture);
+            Box(parent, "Mannequin platform", new Vector3(-4.2f, 0.075f, 13.9f), new Vector3(3.0f, 0.15f, 1.2f), fixture);
+            Box(parent, "Electronics wall", new Vector3(4.2f, 1.0f, 14.45f), new Vector3(6.4f, 2.0f, 0.55f), fixture);
+            Box(parent, "Electronics table", new Vector3(2.4f, 0.45f, 11.0f), new Vector3(1.6f, 0.9f, 0.8f), fixture);
+            Box(parent, "Electronics table", new Vector3(6.0f, 0.45f, 11.0f), new Vector3(1.6f, 0.9f, 0.8f), fixture);
+            Box(parent, "Home shelf", new Vector3(14.5f, 0.8f, -4.5f), new Vector3(0.45f, 1.6f, 3.0f), fixture);
+            Box(parent, "Home table", new Vector3(11.2f, 0.375f, -5.2f), new Vector3(1.4f, 0.75f, 0.85f), fixture);
+            Box(parent, "Service desk", new Vector3(-6.8f, 0.525f, -13.3f), new Vector3(2.4f, 1.05f, 0.7f), fixture);
             Box(parent, "Entrance", new Vector3(0, 0.02f, -13), new Vector3(4, 0.04f, 2), new Color(0.2f, 0.45f, 0.25f));
             Box(parent, "Warehouse wall", new Vector3(-8, 1.5f, 11.75f), new Vector3(0.4f, 3, 6.5f), new Color(0.25f, 0.22f, 0.2f));
             Box(parent, "Warehouse south wall left", new Vector3(-13.2f, 1.5f, 8), new Vector3(3.2f, 3, 0.4f), new Color(0.25f, 0.22f, 0.2f));

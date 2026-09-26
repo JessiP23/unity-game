@@ -38,6 +38,15 @@ namespace NightSupermarket.Core
         public NoiseSighting(MapPoint position, float loudness, string source, double timestamp)
         { Position = position; Loudness = loudness; Source = source; Timestamp = timestamp; }
     }
+    public enum EntityKind { Mannequin, Customer, Employee, Guard }
+    /// <summary>Who a camera shows where. Deliberately carries no awareness or suspicion.</summary>
+    public readonly struct EntitySighting
+    {
+        public readonly string Id;
+        public readonly EntityKind Kind;
+        public readonly MapPoint Position;
+        public EntitySighting(string id, EntityKind kind, MapPoint position) { Id = id; Kind = kind; Position = position; }
+    }
     public sealed class LightingState
     {
         public LightingMode Mode { get; private set; } = LightingMode.Normal;
@@ -58,6 +67,15 @@ namespace NightSupermarket.Core
         private readonly List<DoorSighting> doors = new List<DoorSighting>();
         private readonly List<ObjectiveSighting> objectives = new List<ObjectiveSighting>();
         private readonly List<NoiseSighting> noises = new List<NoiseSighting>();
+        private readonly List<EntitySighting> entities = new List<EntitySighting>();
+        private readonly List<SuspiciousActivityEvent> alerts = new List<SuspiciousActivityEvent>();
+        public void ReportEntities(IReadOnlyList<EntitySighting> sightings) => Replace(entities, sightings);
+        /// <summary>Customer reports heard on the store radio: last-known spot only.</summary>
+        public void ReportAlert(SuspiciousActivityEvent alert)
+        {
+            alerts.Add(alert);
+            if (alerts.Count > 6) alerts.RemoveAt(0);
+        }
         public void ReportGuard(GuardState state, MapPoint position) { GuardState = state; GuardPosition = position; }
         public void ReportLighting(LightingMode mode) => Lighting = mode;
         public void ReportPlayers(IReadOnlyList<PlayerSighting> sightings) => Replace(players, sightings);
@@ -73,7 +91,7 @@ namespace NightSupermarket.Core
             view = null;
             if (reader == null || (reader.State != PlayerState.Captured && reader.State != PlayerState.Surveillance)) return false;
             view = new SurveillanceView(GuardState, GuardPosition, Lighting,
-                players.ToArray(), doors.ToArray(), objectives.ToArray(), noises.ToArray());
+                players.ToArray(), doors.ToArray(), objectives.ToArray(), noises.ToArray(), entities.ToArray(), alerts.ToArray());
             return true;
         }
         private static void Replace<T>(List<T> destination, IReadOnlyList<T> source)
@@ -92,12 +110,17 @@ namespace NightSupermarket.Core
         public IReadOnlyList<DoorSighting> Doors { get; }
         public IReadOnlyList<ObjectiveSighting> Objectives { get; }
         public IReadOnlyList<NoiseSighting> Noises { get; }
+        public IReadOnlyList<EntitySighting> Entities { get; }
+        public IReadOnlyList<SuspiciousActivityEvent> Alerts { get; }
         public SurveillanceView(GuardState guardState, MapPoint guardPosition, LightingMode lighting,
             IReadOnlyList<PlayerSighting> players, IReadOnlyList<DoorSighting> doors,
-            IReadOnlyList<ObjectiveSighting> objectives, IReadOnlyList<NoiseSighting> noises)
+            IReadOnlyList<ObjectiveSighting> objectives, IReadOnlyList<NoiseSighting> noises,
+            IReadOnlyList<EntitySighting> entities = null, IReadOnlyList<SuspiciousActivityEvent> alerts = null)
         {
             GuardState = guardState; GuardPosition = guardPosition; Lighting = lighting;
             Players = players; Doors = doors; Objectives = objectives; Noises = noises;
+            Entities = entities ?? new EntitySighting[0];
+            Alerts = alerts ?? new SuspiciousActivityEvent[0];
         }
     }
 }

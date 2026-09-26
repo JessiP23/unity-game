@@ -19,4 +19,8 @@
 !.env.example
 __pycache__/
 /.toolchain/
+# Photon App Id lives here. Never commit it.
+/.photon-app-id
+/Assets/Photon/**/PhotonAppSettings.asset
+/Assets/Photon/**/PhotonAppSettings.asset.meta
 /Artifacts/

@@ -56,6 +56,8 @@ namespace NightSupermarket.Editor
             EditorBuildSettings.scenes = scenes.ToArray();
             AssetDatabase.SaveAssets();
             RenderingSetup.Configure();
+            NpcSetup.CreateDefaults();
+            FusionSetup.ApplyAppId();
             Debug.Log("[SETUP] Configuration saved. Restart the Editor before testing input.");
         }
 

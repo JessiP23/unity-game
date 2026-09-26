@@ -7,7 +7,7 @@ namespace NightSupermarket.Editor
     {
         private const string Root = "Assets/Resources/Art/";
         private static readonly Color Plastic = new Color(0.86f, 0.84f, 0.8f);
-        public override uint GetVersion() => 4;
+        public override uint GetVersion() => 5;
         private void OnPreprocessTexture()
         {
             if (!assetPath.StartsWith(Root)) return;
@@ -20,6 +20,8 @@ namespace NightSupermarket.Editor
             importer.sRGBTexture = !normal;
             importer.wrapMode = TextureWrapMode.Repeat;
             importer.anisoLevel = assetPath.Contains("/Surfaces/") ? 8 : 2;
+            importer.alphaIsTransparency = assetPath.Contains("_opacity");
+            importer.alphaSource = assetPath.Contains("_opacity") ? TextureImporterAlphaSource.FromInput : TextureImporterAlphaSource.None;
         }
         private void OnPostprocessTexture(Texture2D texture)
         {

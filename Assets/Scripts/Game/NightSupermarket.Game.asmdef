@@ -1,1 +1,1 @@
-{"name":"NightSupermarket.Game","references":["NightSupermarket.Core","Unity.InputSystem","Unity.AI.Navigation","Unity.TextMeshPro","Unity.ugui","Unity.RenderPipelines.Universal.Runtime","Unity.RenderPipelines.Core.Runtime"]}
+{"name":"NightSupermarket.Game","references":["NightSupermarket.Core","Unity.InputSystem","Unity.AI.Navigation","Unity.TextMeshPro","Unity.ugui","Unity.RenderPipelines.Universal.Runtime","Unity.RenderPipelines.Core.Runtime","Fusion.Unity"]}

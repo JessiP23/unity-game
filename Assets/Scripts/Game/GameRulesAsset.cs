@@ -13,6 +13,8 @@ namespace NightSupermarket.Game
         [Min(0.001f)] public float movementThreshold = 0.08f;
         public bool continuedMovementToDiscover = true;
         [Min(0)] public int inventoryCapacity = 8;
+        [Tooltip("Mannequin players in the match. Customers and staff are NPCs and never use these slots.")]
+        [Min(1)] public int mannequinPlayers = 4;
         [Header("Movement")]
         [Min(0.1f)] public float walkSpeed = 3;
         [Min(0.1f)] public float sprintSpeed = 5;
