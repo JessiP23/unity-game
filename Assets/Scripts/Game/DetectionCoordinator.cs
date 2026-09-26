@@ -8,6 +8,7 @@ namespace NightSupermarket.Game
         private readonly GuardVisionSystem vision;
         private readonly PlayerMotor player;
         private readonly Transform guard;
+        public GuardFlashlight Flashlight { get; set; }
         public DetectionCoordinator(PlayerMotor player, Transform guard, GameRulesAsset rules)
         {
             this.player = player; this.guard = guard;
@@ -17,8 +18,9 @@ namespace NightSupermarket.Game
         public void Tick(float delta)
         {
             if (!player.Record.Free) return;
-            bool visible = vision.CanSee(guard.position + Vector3.up * 0.6f, guard.forward,
-                player.transform.position + Vector3.up, player.transform).Visible;
+            var lamp = Flashlight != null ? Flashlight.Model : null;
+            bool visible = vision.Observed(guard.position + Vector3.up * 0.6f, guard.forward,
+                player.transform.position + Vector3.up, player.transform, lamp);
             Detection.Tick(visible, player.ActualSpeed, delta);
         }
     }

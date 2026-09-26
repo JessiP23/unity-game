@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using NightSupermarket.Core;
 using UnityEngine;
 using UnityEngine.AI;
@@ -10,6 +11,7 @@ namespace NightSupermarket.Game
         public GuardBrain Brain { get; private set; }
         public Vector3 LastKnownPosition { get; private set; }
         public bool DebugVision { get; set; } = true;
+        public GuardFlashlight Flashlight { get; set; }
         private NavMeshAgent agent;
         private GameRulesAsset rules;
         private Vector3[] patrol;
@@ -29,16 +31,43 @@ namespace NightSupermarket.Game
                 { LastKnownPosition = noise.Position; Brain.Hear(); }
             });
         }
+        public void TickGroup(IReadOnlyList<PlayerMotor> targets, IReadOnlyList<DetectionSystem> detections, float delta)
+        {
+            int chosen = -1, suspicious = -1;
+            float best = float.PositiveInfinity, suspiciousDistance = float.PositiveInfinity;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                var target = targets[i];
+                if (target == null || detections[i] == null || !target.Record.Free) continue;
+                Vector3 eye = transform.position + Vector3.up * 0.6f;
+                var result = vision.CanSee(eye, transform.forward, target.transform.position + Vector3.up, target.transform);
+                var lamp = Flashlight != null ? Flashlight.Model : null;
+                bool visible = result.Visible || (lamp != null && vision.Observed(eye, transform.forward, target.transform.position + Vector3.up, target.transform, lamp));
+                if (!visible) continue;
+                if (detections[i].Suspicion.Value > 0 && result.Distance < suspiciousDistance)
+                { suspicious = i; suspiciousDistance = result.Distance; }
+                if (result.Distance < best) { chosen = i; best = result.Distance; }
+            }
+            int index = suspicious >= 0 ? suspicious : chosen;
+            if (index < 0) Tick(null, null, delta);
+            else Tick(targets[index], detections[index], delta);
+        }
         public void Tick(PlayerMotor target, DetectionSystem detection, float delta)
         {
             if (Brain == null || !agent.isOnNavMesh) return;
-            bool seen = target.Record.Free && vision.CanSee(transform.position + Vector3.up * 0.6f, transform.forward,
-                target.transform.position + Vector3.up, target.transform).Visible;
-            bool threat = seen && detection.Suspicion.Value > 0;
-            if (threat) LastKnownPosition = target.transform.position;
+            bool seen = false, threat = false, canCapture = false;
+            if (target != null && detection != null && target.Record.Free)
+            {
+                var lamp = Flashlight != null ? Flashlight.Model : null;
+                seen = vision.Observed(transform.position + Vector3.up * 0.6f, transform.forward,
+                    target.transform.position + Vector3.up, target.transform, lamp);
+                threat = seen && detection.Suspicion.Value > 0;
+                if (threat || (seen && detection.State == DetectionState.Discovered)) LastKnownPosition = target.transform.position;
+                canCapture = seen && detection.State == DetectionState.Discovered
+                    && Vector3.Distance(transform.position, target.transform.position) < rules.captureDistance;
+            }
             bool arrived = !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.15f;
-            Brain.Tick(arrived, threat, seen && detection.State == DetectionState.Discovered
-                && Vector3.Distance(transform.position, target.transform.position) < rules.captureDistance, delta);
+            Brain.Tick(arrived, threat, canCapture, delta);
             if (Brain.AdvancePatrol) waypoint = (waypoint + 1) % patrol.Length;
             bool search = Brain.State == GuardState.Search || Brain.State == GuardState.Capture;
             agent.isStopped = search; agent.updateRotation = !search;

@@ -20,9 +20,24 @@ namespace NightSupermarket.Game
             if (distance > range) return new VisionResult(false, false, distance, 180);
             float angle = Vector3.Angle(forward, direction);
             if (angle > halfFov) return new VisionResult(false, false, distance, angle);
-            bool clear = !Physics.Raycast(eye, direction.normalized, out var hit, distance, mask, QueryTriggerInteraction.Ignore)
-                || (targetRoot != null && hit.transform.IsChildOf(targetRoot));
+            bool clear = ClearLine(eye, target, targetRoot);
             return new VisionResult(clear, clear, distance, angle);
+        }
+        public bool ClearLine(Vector3 eye, Vector3 target, Transform targetRoot)
+        {
+            Vector3 direction = target - eye; float distance = direction.magnitude;
+            if (distance <= 0.05f) return true;
+            if (!Physics.Raycast(eye, direction.normalized, out var hit, distance, mask, QueryTriggerInteraction.Ignore)) return true;
+            return targetRoot != null && (hit.transform == targetRoot || hit.transform.IsChildOf(targetRoot));
+        }
+        /// <summary>Eyes first, then an optional gameplay flashlight cone. Both still require line of sight.</summary>
+        public bool Observed(Vector3 eye, Vector3 forward, Vector3 target, Transform targetRoot, NightSupermarket.Core.FlashlightModel lamp)
+        {
+            if (CanSee(eye, forward, target, targetRoot).Visible) return true;
+            if (lamp == null || !lamp.Enabled) return false;
+            Vector3 direction = target - eye; float distance = direction.magnitude;
+            float angle = distance <= 0.001f ? 0 : Vector3.Angle(forward, direction);
+            return lamp.Covers(distance, angle) && ClearLine(eye, target, targetRoot);
         }
     }
 }

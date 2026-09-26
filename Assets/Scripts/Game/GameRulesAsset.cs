@@ -33,7 +33,13 @@ namespace NightSupermarket.Game
         [Min(1)] public int rescueCount = 1;
         [Min(1)] public int requiredEscapes = 1;
         public bool allowWarehouseSelfRescue;
+        public bool requireMissionsToEscape = true;
+        public bool defeatWhenNoRescueRemains = true;
+        [Header("Flashlight")]
+        [Min(0.1f)] public float flashlightRange = 10;
+        [Range(1, 179)] public float flashlightCone = 40;
         public GameRules CreateRules() => new GameRules(matchDuration, orangeDuration, suspicionInterval,
-            discoveryThreshold, movementThreshold, continuedMovementToDiscover);
+            discoveryThreshold, movementThreshold, continuedMovementToDiscover, rescueCount, requiredEscapes,
+            allowWarehouseSelfRescue, requireMissionsToEscape, defeatWhenNoRescueRemains);
     }
 }

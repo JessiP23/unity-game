@@ -33,5 +33,11 @@ namespace NightSupermarket.Core
             Progress++; Changed?.Invoke();
         }
         public void Fail() { if (Complete || Failed) return; Failed = true; Changed?.Invoke(); }
+        /// <summary>Debug completion. Accepted world actions remain the gameplay path.</summary>
+        public void DebugComplete()
+        {
+            if (Failed || Complete) return;
+            Progress = Rule.Quantity; Changed?.Invoke();
+        }
     }
 }

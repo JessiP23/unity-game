@@ -6,6 +6,7 @@ namespace NightSupermarket.Game
     public sealed class DoorInteractable : MonoBehaviour, IInteractable
     {
         public DoorLock Lock { get; private set; }
+        public string DoorId => id;
         private WorldSignals signals;
         private Vector3 closedPosition;
         private readonly string id = Guid.NewGuid().ToString("N");

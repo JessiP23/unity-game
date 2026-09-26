@@ -4,9 +4,12 @@ Unity primitive cooperative stealth prototype. See [development](Documentation/d
 for the installed local toolchain and commands, [architecture](Documentation/architecture.md)
 for system boundaries and [phase status](Documentation/phase-status.md) for progress.
 
-Phase 0 validated: Unity import/configuration, EditMode and PlayMode smoke tests,
-and Windows development build. Windows executable has not been run on this Mac.
-Gameplay development follows the phase order in [the brief](Documentation/original-brief.txt).
+The local night loop is playable with primitives: move, get seen, freeze, get
+captured, rescue a teammate, finish the crate objectives and escape before dawn.
+Online Fusion and PlayFab are not connected yet. See
+[phase status](Documentation/phase-status.md).
+
+Open the prototype scene and press Play. Tab switches mannequins. F1 shows debug keys.
 
 ```sh
 python3 Tools/unity.py open

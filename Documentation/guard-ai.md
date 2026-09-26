@@ -7,3 +7,6 @@ adapts its decisions to NavMeshAgent. Noise is filtered by distance × loudness;
 chase/capture take priority over noise. Search rotates locally, then returns to
 patrol. Physics geometry supplies the runtime NavMesh; actors/items are excluded,
 and the door is a carving obstacle. Vision/suspicion remain separate services.
+Discovery capture is performed by the match authority, including when the guard
+has not yet closed to capture distance. The guard's Capture handler then returns
+to patrol. A player-controlled guard would send decisions into the same brain.

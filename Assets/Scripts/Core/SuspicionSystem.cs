@@ -26,5 +26,11 @@ namespace NightSupermarket.Core
             return !rules.ContinuedMovementToDiscover && Value >= rules.DiscoveryThreshold;
         }
         public void Reset() { Value = 0; moving = false; cooldown = 0; }
+        /// <summary>Debug override. Gameplay suspicion only changes through <see cref="Tick"/>.</summary>
+        public void DebugSet(int value)
+        {
+            if (value < 0) throw new ArgumentOutOfRangeException(nameof(value));
+            Value = value; moving = false; cooldown = 0;
+        }
     }
 }

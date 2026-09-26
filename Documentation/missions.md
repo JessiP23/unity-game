@@ -8,3 +8,6 @@ counts an object once, preventing repeated pickup/event replay from farming
 progress. Optional personal owner and required inventory item are validated.
 PlacementZone reports a released, settled item inside its trigger. Prototype
 assets configure collect-three and place-one objectives without name-based logic.
+Escape asks the authority whether required missions are complete. The exit does
+not hardcode those mission names. Debug completion exists for testing and is not
+the gameplay path.

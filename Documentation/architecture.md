@@ -1,17 +1,13 @@
 # Architecture
 
-Planned boundaries (not yet implemented):
-- Domain: plain C# rules, explicit tick/delta inputs, no Unity or SDK dependencies.
-- Unity adapters: input, CharacterController, physics perception, NavMesh, presentation.
-- Composition root: constructs services and coordinates lifetime, not gameplay rules.
-- Networking: authority validates commands; adapters replicate accepted state.
-- Backend: accounts/lobbies/profile persistence separate from match state.
+Domain rules live in `NightSupermarket.Core` and do not reference Unity. Unity adapters in `NightSupermarket.Game` own input, CharacterController movement, physics perception, NavMesh, placeholder presentation and the primitive supermarket. `PrototypeRoot` constructs those pieces and schedules ticks. It does not decide win, loss, capture or rescue.
 
-Add Assets/Scripts/Core and a noEngineReferences assembly in Phase 1. Add feature folders as needed. Keep Editor code separate and tests outside shipping assemblies. Prefer injected dependencies, typed events, explicit subscription teardown, and configuration assets. Models, audio and animation are replaceable presentation.
+Match mutations go through `LocalMatchAuthority`. It owns the clock, phase flow, warehouse roster, escape ledger, surveillance board, lighting mode and audio cue stream. `MatchOutcomeEvaluator` is the only place that turns those facts into victory or defeat.
 
-Phase 1 implements Core (no engine references) and Game (Unity adapters).
-GameRules validates immutable domain settings; GameRulesAsset is editable Unity
-configuration. GameClock receives explicit delta time. MatchFlow only permits
-bootstrap → lobby → night → a terminal outcome. EventStream subscriptions are
-owned/disposed by consumers. LocalSession uses generated identities and rejects
-unknown/mismatched callers. GameLog can be disabled independently of gameplay.
+Player commands must match `IPlayerSession`. `AcceptClientClaim` ignores declarations such as "I escaped" or "I completed the mission". Validated methods re-check phase, identity, inventory and mission completion.
+
+Networking and account interfaces (`INetworkService`, `ILobbyService`, `IMatchService`, `IPlayerDataService`) have local implementations. Profile storage keeps look sensitivity only. Match progress is not written there.
+
+Presentation is replaceable. `PoseMap` exposes the pose an animator would play. `FlashlightModel` is the gameplay cone; a spot light only draws it. `AudioCue` is a hook with no clips. `PrototypeHud` uses TextMeshPro when an OS font can be built, and IMGUI otherwise.
+
+The local prototype runs two mannequin identities in one process. Tab changes which identity receives input. That is a test control scheme, not a second ruleset.

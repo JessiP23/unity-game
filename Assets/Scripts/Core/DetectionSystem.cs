@@ -9,11 +9,13 @@ namespace NightSupermarket.Core
         public event Action<DetectionState> Changed;
         private readonly GameRules rules;
         private double observedTime;
+        /// <summary>When set, observation ticks do not overwrite a debug state.</summary>
+        public bool Hold { get; private set; }
         public DetectionSystem(GameRules rules) { this.rules = rules; Suspicion = new SuspicionSystem(rules); }
         public void Tick(bool observed, double actualSpeed, double delta)
         {
             GameRules.RequireDelta(delta);
-            if (State == DetectionState.Discovered || delta == 0) return;
+            if (Hold || State == DetectionState.Discovered || delta == 0) return;
             if (!observed)
             {
                 observedTime = 0; SetState(DetectionState.Green); Suspicion.Tick(false, delta); return;
@@ -30,6 +32,14 @@ namespace NightSupermarket.Core
             if (Suspicion.Tick(actualSpeed > rules.MovementThreshold, redDelta)) SetState(DetectionState.Discovered);
         }
         private void SetState(DetectionState state) { if (State == state) return; State = state; Changed?.Invoke(state); }
-        public void Reset() { observedTime = 0; Suspicion.Reset(); SetState(DetectionState.Green); }
+        public void Reset() { Hold = false; observedTime = 0; Suspicion.Reset(); SetState(DetectionState.Green); }
+        /// <summary>Debug override. Observation gameplay still goes through <see cref="Tick"/>.</summary>
+        public void DebugOverride(DetectionState state, int suspicion)
+        {
+            Suspicion.DebugSet(suspicion);
+            Hold = state != DetectionState.Green;
+            observedTime = state == DetectionState.Orange ? 0 : rules.OrangeDuration;
+            SetState(state);
+        }
     }
 }

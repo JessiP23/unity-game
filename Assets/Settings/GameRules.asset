@@ -39,3 +39,7 @@ MonoBehaviour:
   rescueCount: 1
   requiredEscapes: 1
   allowWarehouseSelfRescue: 0
+  requireMissionsToEscape: 1
+  defeatWhenNoRescueRemains: 1
+  flashlightRange: 10
+  flashlightCone: 40

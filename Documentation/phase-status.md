@@ -11,15 +11,17 @@
 | 6 | Missions | Passed: 24 EditMode total |
 | 7 | Keys and doors | Passed: 26 EditMode total |
 | 8 | Guard AI and hearing | Passed: 29 EditMode, 5 PlayMode total |
-| 9 | Capture, warehouse, surveillance, rescue | Pending |
-| 10 | Timer, escape, outcomes | Pending |
-| 11 | Local networking abstraction | Pending |
-| 12 | Fusion integration | Pending local tests |
-| 13 | Multiplayer tests | Pending Fusion |
-| 14 | Performance tests | Pending playable multiplayer |
-| 15 | Programming cleanup | Pending prior acceptance |
-| Backend | PlayFab accounts/lobby | After multiplayer validation |
+| 9 | Capture, warehouse, surveillance, rescue | Passed with phases 10–11 |
+| 10 | Timer, escape, outcomes | Passed: dawn, victory, all-captured defeat |
+| 11 | Local networking abstraction | Passed: claims rejected, lobby/profile separate from match |
+| 12 | Fusion integration | Blocked: not installed. See networking.md |
+| 13 | Online multiplayer tests | Blocked on Fusion. Local authority tests cover the trust rules |
+| 14 | Performance profiling | Not run. Vision already filters distance, then angle, then line of sight |
+| 15 | Programming cleanup for the local loop | Local prototype scene loads and simulates |
+| Backend | PlayFab accounts/lobby | Not installed. `IPlayerDataService` is in-memory only |
 | Art | Models, environment, animations, audio, UI | After programming acceptance |
 | Polish | Final refinement | After asset integration |
 
-A prepared dependency is not evidence that a system is implemented or tested.
+Latest Unity results after phases 9–11: EditMode 41 passed, PlayMode 7 passed, zero failed. The PlayMode total includes a prototype scene load that builds the night, guard, rescue console, escape door and surveillance terminal.
+
+A prepared dependency is not evidence that a system is implemented or tested. Local hot-seat play is not online multiplayer.

@@ -46,9 +46,15 @@ animation, audio, IMGUI, JSON serialization, UI, UIElements and UnityWebRequest.
 Transitive packages are resolved by Unity, with exact resolution recorded in
 `Packages/packages-lock.json` after import. No separate legacy TMP package.
 
-Fusion 2 follows local gameplay validation; PlayFab follows multiplayer tests.
-Their exact versions and APIs will be verified at integration. No SDK credentials
-are stored in the project. No final art is imported.
+Fusion 2 and PlayFab are still absent. Fusion 2.1.1 expects Unity 6000.3+, which
+is newer than the pinned 6000.0.71f1 Editor, so it was not added. See
+[networking](networking.md). No SDK credentials are stored in the project.
+No final art is imported.
+
+The prototype scene is the local night loop: two mannequins, an AI guard,
+collect/place objectives, an employee door, warehouse rescue and an escape door.
+Tab switches the controlled mannequin. F1 lists debug keys. This is hot-seat
+authority, not online multiplayer.
 
 ## Conventions
 Small responsibilities; PascalCase types/methods; explicit dependencies; XML

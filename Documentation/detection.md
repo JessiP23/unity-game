@@ -9,3 +9,6 @@ SuspicionSystem owns integer increments: movement onset, then fixed cadence.
 Suspicion persists when vision is lost; discovery persists until explicit reset.
 Default discovery requires a further valid movement event after reaching the
 threshold. Orange overflow time is applied to red, so large steps do not erase it.
+Discovery notifies the match authority, which captures the mannequin. Vision can
+also accept a flashlight cone, and that cone still requires line of sight. The
+rendered light is not part of the check.
