@@ -10,7 +10,7 @@
 | 5 | Inventory | Passed: 16 EditMode total |
 | 6 | Missions | Passed: 24 EditMode total |
 | 7 | Keys and doors | Passed: 26 EditMode total |
-| 8 | Guard AI and hearing | Pending |
+| 8 | Guard AI and hearing | Passed: 29 EditMode, 5 PlayMode total |
 | 9 | Capture, warehouse, surveillance, rescue | Pending |
 | 10 | Timer, escape, outcomes | Pending |
 | 11 | Local networking abstraction | Pending |

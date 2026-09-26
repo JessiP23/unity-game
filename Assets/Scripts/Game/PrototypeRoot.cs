@@ -1,6 +1,8 @@
 using NightSupermarket.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.AI.Navigation;
+using UnityEngine.AI;
 namespace NightSupermarket.Game
 {
     /// <summary>Scene composition and simulation scheduling; rules live in dedicated services.</summary>
@@ -12,11 +14,13 @@ namespace NightSupermarket.Game
         private InteractionProbe interaction;
         private DetectionCoordinator detection;
         private MissionSystem missions;
+        private GuardController guardController;
         private readonly WorldSignals signals = new WorldSignals();
         private void Start()
         {
             PrimitiveWorld.Build(transform);
             var actor = new GameObject("Mannequin"); actor.transform.SetParent(transform);
+            actor.layer = 2;
             actor.transform.position = new Vector3(0, 0.1f, -11);
             Player = actor.AddComponent<PlayerMotor>(); Player.Configure(rules, new PlayerRecord(new LocalSession().Join()));
             actor.AddComponent<CarrySystem>().Configure(Player);
@@ -31,21 +35,28 @@ namespace NightSupermarket.Game
             for (int i = 0; i < 3; i++)
             {
                 var box = PrimitiveWorld.Box(transform, "Collectible crate", new Vector3(-2 + i * 2, 0.5f, -8), Vector3.one * 0.6f, Color.yellow);
+                box.layer = 3;
                 box.AddComponent<PhysicalItem>().Configure(itemData, signals);
             }
             var keyData = ScriptableObject.CreateInstance<ItemDefinition>(); keyData.id = "employee-key";
             keyData.displayName = "Employee key"; keyData.inventoryOnly = true; keyData.slotCost = 0;
             var key = PrimitiveWorld.Box(transform, "Employee key", new Vector3(9, 0.5f, -10), Vector3.one * 0.3f, Color.cyan);
+            key.layer = 3;
             key.AddComponent<PhysicalItem>().Configure(keyData, signals);
             var door = PrimitiveWorld.Box(transform, "Employee door", new Vector3(10, 1.3f, 5), new Vector3(2, 2.6f, 0.3f), Color.blue);
             door.AddComponent<DoorInteractable>().Configure("employee-key", signals);
+            door.AddComponent<NavMeshObstacle>().carving = true;
             var guard = GameObject.CreatePrimitive(PrimitiveType.Capsule); guard.name = "Guard";
             guard.transform.SetParent(transform); guard.transform.position = new Vector3(3, 1, -5);
             guard.layer = 2; guard.transform.rotation = Quaternion.Euler(0, 180, 0);
+            var surface = gameObject.AddComponent<NavMeshSurface>(); surface.collectObjects = CollectObjects.Children;
+            surface.layerMask = 1; surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders; surface.BuildNavMesh();
+            guardController = guard.AddComponent<GuardController>();
+            guardController.Configure(rules, signals, new[] { new Vector3(3, 0, -8), new Vector3(10, 0, 0), new Vector3(3, 0, 8), new Vector3(-10, 0, 0) });
             detection = new DetectionCoordinator(Player, guard.transform, rules);
             Cursor.lockState = CursorLockMode.Locked;
         }
-        private void FixedUpdate() { if (Player != null) { Player.Simulate(input.Consume(), Time.fixedDeltaTime); detection.Tick(Time.fixedDeltaTime); } }
+        private void FixedUpdate() { if (Player != null) { Player.Simulate(input.Consume(), Time.fixedDeltaTime); detection.Tick(Time.fixedDeltaTime); guardController.Tick(Player, detection.Detection, Time.fixedDeltaTime); } }
         private void Update()
         {
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) Cursor.lockState = CursorLockMode.None;

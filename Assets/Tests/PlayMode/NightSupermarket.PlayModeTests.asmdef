@@ -2,7 +2,8 @@
   "name": "NightSupermarket.PlayModeTests",
   "references": [
     "NightSupermarket.Core",
-    "NightSupermarket.Game"
+    "NightSupermarket.Game",
+    "Unity.AI.Navigation"
   ],
   "includePlatforms": [],
   "optionalUnityReferences": [

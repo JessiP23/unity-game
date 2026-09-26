@@ -43,3 +43,6 @@ PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured m
 
 ## Phase 7
 26 EditMode passed. Doors reject missing/wrong keys; reusable and consumed key behavior and locked/open toggles covered.
+
+## Phase 8
+29 EditMode and 5 PlayMode passed. Guard state transitions, chase priority/loss, runtime NavMesh traversal and hearing integration covered.
