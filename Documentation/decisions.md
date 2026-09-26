@@ -20,6 +20,7 @@
 12. `MatchOutcomeEvaluator` is the only win/loss decision. Default victory is the configured escape count after required missions. Dawn, or every mannequin captured with no rescue path left, is defeat. Self-rescue is off unless configured.
 13. One successful escape wins by default because `requiredEscapes` is 1. Raise it when every mannequin must leave.
 14. Offline play uses `LocalMatchAuthority` as the server. Hot-seat Tab switching only changes which local identity may send commands.
-15. Photon Fusion is not installed. Fusion 2.1.1, checked September 2026, targets Unity 6000.3 or newer. This repo is pinned to 6000.0.71f1, so adding that package would break the pin. No Fusion API is invented in source.
-16. PlayFab is not installed. Account data stays behind `IPlayerDataService` and is not mixed with match state.
+15. Photon Fusion is not installed. Fusion 2.0.13 is the official build that lists Unity 6.0.x. Its download requires a signed-in Photon account and returned 403 here. Fusion 2.1 targets Unity 6000.3 or newer. No Fusion API is invented in source.
+16. PlayFab is not installed. The current Unity 6 package depends on Microsoft GDK, which this Mac editor does not use. Account data stays behind `IPlayerDataService` and is not mixed with match state.
 17. The guard flashlight is a gameplay cone the vision query can consume. The Unity `Light` does not decide detection.
+18. A player can drive the same guard body. That replaces navigation input only. Vision, hearing, and detection stay on that body.

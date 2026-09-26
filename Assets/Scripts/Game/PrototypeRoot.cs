@@ -12,7 +12,7 @@ namespace NightSupermarket.Game
     public sealed class PrototypeRoot : MonoBehaviour
     {
         public GameRulesAsset rules;
-        public PlayerMotor Player => pawns.Count > 0 ? pawns[active].Motor : null;
+        public PlayerMotor Player => active >= 0 && active < pawns.Count ? pawns[active].Motor : null;
         private readonly List<Pawn> pawns = new List<Pawn>();
         private readonly List<DoorInteractable> doors = new List<DoorInteractable>();
         private readonly WorldSignals signals = new WorldSignals();
@@ -20,6 +20,8 @@ namespace NightSupermarket.Game
         private LocalMatchAuthority authority;
         private MissionSystem missions;
         private GuardController guardController;
+        private PlayerInputReader guardInput;
+        private PlayerView guardView;
         private PrototypeHud hud;
         private int active;
         private bool help = true;
@@ -77,6 +79,9 @@ namespace NightSupermarket.Game
             guardController = guard.AddComponent<GuardController>();
             guardController.Flashlight = flashlight;
             guardController.Configure(rules, signals, new[] { new Vector3(3, 0, -8), new Vector3(10, 0, 0), new Vector3(3, 0, 8), new Vector3(-10, 0, 0) });
+            guardInput = guard.AddComponent<PlayerInputReader>(); guardInput.Active = false;
+            guardView = guard.AddComponent<PlayerView>(); guardView.ConfigureStandalone(rules.lookSensitivity, 0.6f);
+            guardView.Active = false; guardView.View.gameObject.SetActive(false);
             foreach (var pawn in pawns)
             {
                 pawn.Detection = new DetectionCoordinator(pawn.Motor, guard.transform, rules) { Flashlight = flashlight };
@@ -161,7 +166,13 @@ namespace NightSupermarket.Game
                 }
                 motors[i] = pawn.Motor; vision[i] = pawn.Detection != null ? pawn.Detection.Detection : null;
             }
-            guardController.TickGroup(motors, vision, delta);
+            if (guardController.PlayerDriven)
+            {
+                var command = guardInput.Consume();
+                if (authority.Flow.Phase != MatchPhase.Night) command = default;
+                guardController.Drive(command.Move, command.Sprint ? rules.sprintSpeed : rules.walkSpeed, delta);
+            }
+            else guardController.TickGroup(motors, vision, delta);
             if (missions != null && missions.Complete && !missionsAnnounced)
             { missionsAnnounced = true; authority.Audio.Publish(AudioCue.MissionComplete); }
             authority.MissionsComplete = () => missions != null && missions.Complete;
@@ -200,10 +211,10 @@ namespace NightSupermarket.Game
             if (keyboard.escapeKey.wasPressedThisFrame) Cursor.lockState = CursorLockMode.None;
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && authority.Flow.Phase == MatchPhase.Night)
                 Cursor.lockState = CursorLockMode.Locked;
-            if (keyboard.tabKey.wasPressedThisFrame) SetActive((active + 1) % pawns.Count);
+            if (keyboard.tabKey.wasPressedThisFrame) SetActive((active + 1) % (pawns.Count + 1));
             if (keyboard.vKey.wasPressedThisFrame) ToggleSurveillance();
             if (keyboard.f1Key.wasPressedThisFrame) help = !help;
-            if (keyboard.f2Key.wasPressedThisFrame && authority.TryCapture(Player.Record.Id))
+            if (keyboard.f2Key.wasPressedThisFrame && Player != null && authority.TryCapture(Player.Record.Id))
                 Player.Teleport(new Vector3(-13.2f + authority.Warehouse.Count * 0.9f, 0.1f, 11));
             if (keyboard.f3Key.wasPressedThisFrame) RescueFromDebug();
             if (keyboard.f4Key.wasPressedThisFrame && missions != null)
@@ -227,6 +238,7 @@ namespace NightSupermarket.Game
         }
         private void ToggleSurveillance()
         {
+            if (Player == null) return;
             string id = Player.Record.Id;
             if (Player.Record.State == PlayerState.Captured) authority.TryEnterSurveillance(id, id);
             else if (Player.Record.State == PlayerState.Surveillance) authority.TryLeaveSurveillance(id, id);
@@ -242,6 +254,7 @@ namespace NightSupermarket.Game
         }
         private void CycleDetection()
         {
+            if (Player == null || pawns[active].Detection == null) return;
             var detection = pawns[active].Detection.Detection;
             DetectionState next = detection.State switch
             {
@@ -254,6 +267,7 @@ namespace NightSupermarket.Game
         }
         private void AddSuspicion()
         {
+            if (Player == null || pawns[active].Detection == null) return;
             var detection = pawns[active].Detection.Detection;
             int value = detection.Suspicion.Value + 1;
             detection.DebugOverride(value >= rules.discoveryThreshold ? DetectionState.Discovered : detection.State, value);
@@ -286,6 +300,7 @@ namespace NightSupermarket.Game
         }
         private void SpawnCrate()
         {
+            if (Player == null) return;
             var data = ScriptableObject.CreateInstance<ItemDefinition>(); data.canBreak = true; data.id = "debug-crate";
             Vector3 position = Player.transform.position + Player.transform.forward * 1.5f + Vector3.up;
             var box = PrimitiveWorld.Box(transform, "Debug crate", position, Vector3.one * 0.6f, Color.magenta);
@@ -302,9 +317,23 @@ namespace NightSupermarket.Game
                 pawns[i].View.Active = on;
                 pawns[i].View.View.gameObject.SetActive(on);
             }
+            bool driving = active == pawns.Count;
+            if (guardController != null) guardController.PlayerDriven = driving;
+            if (guardInput != null) guardInput.Active = driving;
+            if (guardView != null) { guardView.Active = driving; guardView.View.gameObject.SetActive(driving); }
         }
         private string BuildHud()
         {
+            if (active == pawns.Count)
+            {
+                var builderGuard = new StringBuilder();
+                int guardSeconds = Mathf.CeilToInt((float)authority.Clock.Remaining);
+                builderGuard.Append("NIGHT SUPERMARKET  ").Append(guardSeconds / 60).Append(':').Append((guardSeconds % 60).ToString("00"));
+                builderGuard.Append("\nPlaying the GUARD. Same vision, hearing, and detection as the AI.\n");
+                builderGuard.Append("WASD look with the mouse. Tab returns to a mannequin.\n");
+                if (help) builderGuard.Append("F1 help  F8 pause  F9 +60s  F10 light  F11 guard state  T flashlight");
+                return builderGuard.ToString();
+            }
             var pawn = pawns[active];
             var builder = new StringBuilder();
             int seconds = Mathf.CeilToInt((float)authority.Clock.Remaining);
@@ -333,7 +362,7 @@ namespace NightSupermarket.Game
                 for (int i = 0; i < view.Players.Count; i++)
                     builder.Append("man ").Append(i + 1).Append(' ').Append(view.Players[i].State).Append('\n');
             }
-            if (help) builder.Append("Tab switch  V surveillance  F1 help  F2 capture  F3 rescue  F4 complete  F5 fail\nF6 detection  F7 suspicion  F8 pause  F9 +60s  F10 light  F11 guard  Home dawn  End win  Del lose");
+            if (help) builder.Append("Tab mannequin/guard  V surveillance  F1 help  F2 capture  F3 rescue  F4 complete  F5 fail\nF6 detection  F7 suspicion  F8 pause  F9 +60s  F10 light  F11 guard  Home dawn  End win  Del lose");
             return builder.ToString();
         }
         private void OnGUI()

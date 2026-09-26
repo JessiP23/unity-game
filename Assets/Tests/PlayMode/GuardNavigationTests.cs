@@ -28,6 +28,13 @@ namespace NightSupermarket.Tests
                 Assert.That(Vector3.Distance(start, guardObject.transform.position), Is.GreaterThan(0.1f));
                 signals.Noise.Publish(new NoiseEvent(guardObject.transform.position, 1, "test"));
                 Assert.That(guard.Brain.State, Is.EqualTo(NightSupermarket.Core.GuardState.Investigate));
+                guard.PlayerDriven = true; guardObject.transform.rotation = Quaternion.LookRotation(Vector3.right);
+                Vector3 driven = guardObject.transform.position;
+                for (int i = 0; i < 20; i++) guard.Drive(Vector2.up, 3f, 0.05f);
+                Assert.That(Vector3.Distance(driven, guardObject.transform.position), Is.GreaterThan(0.2f));
+                var eyes = new GuardVisionSystem(12, 90, ~0);
+                Assert.That(eyes.CanSee(guardObject.transform.position + Vector3.up * 0.6f, guardObject.transform.forward,
+                    guardObject.transform.position + guardObject.transform.forward * 3).Visible, Is.True);
             }
             finally { Object.Destroy(guardObject); Object.Destroy(world); Object.Destroy(rules); }
         }

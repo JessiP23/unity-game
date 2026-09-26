@@ -12,6 +12,7 @@ namespace NightSupermarket.Game
     {
         private readonly float range, halfFov;
         private readonly int mask;
+        public int LineTests { get; private set; }
         public GuardVisionSystem(float distance, float fieldOfView, int obstacleMask)
         { range = distance; halfFov = fieldOfView / 2; mask = obstacleMask; }
         public VisionResult CanSee(Vector3 eye, Vector3 forward, Vector3 target, Transform targetRoot = null)
@@ -23,8 +24,10 @@ namespace NightSupermarket.Game
             bool clear = ClearLine(eye, target, targetRoot);
             return new VisionResult(clear, clear, distance, angle);
         }
+        public void ResetLineTests() => LineTests = 0;
         public bool ClearLine(Vector3 eye, Vector3 target, Transform targetRoot)
         {
+            LineTests++;
             Vector3 direction = target - eye; float distance = direction.magnitude;
             if (distance <= 0.05f) return true;
             if (!Physics.Raycast(eye, direction.normalized, out var hit, distance, mask, QueryTriggerInteraction.Ignore)) return true;

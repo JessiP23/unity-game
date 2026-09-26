@@ -50,4 +50,6 @@ PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured m
 ## Phases 9–11
 EditMode 41 passed and PlayMode 7 passed, zero failed or skipped. New coverage: warehouse capture, single and group rescue, self-rescue configuration, rescue after defeat, surveillance access, dawn, mission-gated escape, key-gated escape, all-mannequin defeat, client-claim rejection, impersonation, local lobby/profile separation, flashlight cone and pose mapping. PlayMode confirms captured movement stays locked until rescue, and the prototype scene loads the night with a guard, rescue console, escape door and surveillance terminal.
 
-Not run: Unity profiler, an online Fusion session, PlayFab, or the Windows executable on this Mac. Push still has no dedicated physics assertion.
+Push, player-driven guard movement, and staged vision now have PlayMode coverage. Out-of-range and out-of-FOV checks must leave the line-test count at zero. A reachable push must change horizontal velocity; a far, non-pushable, or captured push must not.
+
+Not run: an online Fusion session, PlayFab, a Unity profiler capture, or the Windows executable on this Mac. Photon and PlayFab downloads require accounts this environment cannot sign into.

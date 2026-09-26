@@ -11,6 +11,7 @@ namespace NightSupermarket.Game
         public GuardBrain Brain { get; private set; }
         public Vector3 LastKnownPosition { get; private set; }
         public bool DebugVision { get; set; } = true;
+        public bool PlayerDriven { get; set; }
         public GuardFlashlight Flashlight { get; set; }
         private NavMeshAgent agent;
         private GameRulesAsset rules;
@@ -52,9 +53,21 @@ namespace NightSupermarket.Game
             if (index < 0) Tick(null, null, delta);
             else Tick(targets[index], detections[index], delta);
         }
+        /// <summary>Same body and perception as the AI. Input replaces patrol goals; it does not create a second rule set.</summary>
+        public void Drive(Vector2 move, float speed, float delta)
+        {
+            if (agent == null || !agent.isOnNavMesh) return;
+            agent.ResetPath();
+            agent.updateRotation = false;
+            agent.isStopped = true;
+            Vector2 clamped = Vector2.ClampMagnitude(move, 1f);
+            Vector3 world = transform.TransformDirection(new Vector3(clamped.x, 0f, clamped.y));
+            if (world.sqrMagnitude < 0.0001f) return;
+            agent.Move(world * speed * delta);
+        }
         public void Tick(PlayerMotor target, DetectionSystem detection, float delta)
         {
-            if (Brain == null || !agent.isOnNavMesh) return;
+            if (PlayerDriven || Brain == null || !agent.isOnNavMesh) return;
             bool seen = false, threat = false, canCapture = false;
             if (target != null && detection != null && target.Record.Free)
             {

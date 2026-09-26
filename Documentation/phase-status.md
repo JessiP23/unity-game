@@ -14,10 +14,10 @@
 | 9 | Capture, warehouse, surveillance, rescue | Passed with phases 10–11 |
 | 10 | Timer, escape, outcomes | Passed: dawn, victory, all-captured defeat |
 | 11 | Local networking abstraction | Passed: claims rejected, lobby/profile separate from match |
-| 12 | Fusion integration | Blocked: not installed. See networking.md |
+| 12 | Fusion integration | Blocked: Photon sign-in required for Fusion 2.0.13. No invented API |
 | 13 | Online multiplayer tests | Blocked on Fusion. Local authority tests cover the trust rules |
-| 14 | Performance profiling | Not run. Vision already filters distance, then angle, then line of sight |
-| 15 | Programming cleanup for the local loop | Local prototype scene loads and simulates |
+| 14 | Staged vision cost | Passed: out-of-range and out-of-FOV checks do not raycast |
+| 15 | Player guard and push | Passed locally. Same guard body can be driven by a player |
 | Backend | PlayFab accounts/lobby | Not installed. `IPlayerDataService` is in-memory only |
 | Art | Models, environment, animations, audio, UI | After programming acceptance |
 | Polish | Final refinement | After asset integration |

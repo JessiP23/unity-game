@@ -23,9 +23,9 @@ Clients must not be given a way to call the authority methods directly. A future
 
 ## Photon Fusion
 
-Not integrated.
+Not integrated. No Fusion type is referenced.
 
-Official package line: Photon Fusion 2, distributed as the Fusion SDK rather than a guessed `packages.unity.com` version in this repo. Asset Store listing 2.1.1 (3 July 2026) and the Essentials sample require Unity 6000.3 or newer. This project is pinned to Unity 6000.0.71f1. Installing 2.1 here would violate that pin, so the SDK was not added and no Fusion type is referenced.
+Fusion 2.0.13 Stable (16 September 2026, build 2379) is the official line that lists Unity 6.0.x support, which matches this pin. Fusion 2.1.3 requires a newer Unity. The 2.0.13 package URL responds with Photon’s sign-in wall (`403 - No Access`). The SDK was not downloaded, and none of its API was written from memory.
 
 When the Unity pin moves to a version Fusion supports, integration should:
 

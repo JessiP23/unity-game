@@ -51,10 +51,12 @@ is newer than the pinned 6000.0.71f1 Editor, so it was not added. See
 [networking](networking.md). No SDK credentials are stored in the project.
 No final art is imported.
 
-The prototype scene is the local night loop: two mannequins, an AI guard,
+The prototype scene is the local night loop: two mannequins, one guard body,
 collect/place objectives, an employee door, warehouse rescue and an escape door.
-Tab switches the controlled mannequin. F1 lists debug keys. This is hot-seat
-authority, not online multiplayer.
+Tab switches mannequins and then the guard. The guard uses the same eyes either
+way. F1 lists debug keys. This is hot-seat authority, not online multiplayer.
+Photon Fusion 2.0.13 and PlayFab both require account downloads that are not in
+this repo.
 
 ## Conventions
 Small responsibilities; PascalCase types/methods; explicit dependencies; XML

@@ -20,6 +20,12 @@ namespace NightSupermarket.Tests
                 Assert.That(vision.CanSee(eye, Vector3.forward, eye + Vector3.forward * 11).Visible, Is.False);
                 wall.SetActive(true); Physics.SyncTransforms(); yield return null;
                 Assert.That(vision.CanSee(eye, Vector3.forward, eye + Vector3.forward * 5).Visible, Is.False);
+                vision.ResetLineTests();
+                Assert.That(vision.CanSee(eye, Vector3.forward, eye + Vector3.forward * 30).Visible, Is.False);
+                Assert.That(vision.CanSee(eye, Vector3.forward, eye - Vector3.forward * 3).Visible, Is.False);
+                Assert.That(vision.LineTests, Is.Zero);
+                Assert.That(vision.CanSee(eye, Vector3.forward, eye + Vector3.forward * 4).LineOfSight, Is.False);
+                Assert.That(vision.LineTests, Is.EqualTo(1));
             }
             finally { Object.Destroy(wall); }
         }
