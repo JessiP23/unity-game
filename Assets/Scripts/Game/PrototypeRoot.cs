@@ -25,7 +25,7 @@ namespace NightSupermarket.Game
         private CharacterVisual guardVisual;
         private PrototypeHud hud;
         private int active;
-        private bool help = true;
+        private bool help;
         private bool logAudio = true;
         private bool missionsAnnounced;
         private IDisposable audioSubscription;
@@ -220,28 +220,61 @@ namespace NightSupermarket.Game
                 Cursor.lockState = CursorLockMode.Locked;
             if (keyboard.tabKey.wasPressedThisFrame) SetActive((active + 1) % (pawns.Count + 1));
             if (keyboard.vKey.wasPressedThisFrame) ToggleSurveillance();
-            if (keyboard.f1Key.wasPressedThisFrame) help = !help;
-            if (keyboard.f2Key.wasPressedThisFrame && Player != null && authority.TryCapture(Player.Record.Id))
-                Player.Teleport(new Vector3(-13.2f + authority.Warehouse.Count * 0.9f, 0.1f, 11));
-            if (keyboard.f3Key.wasPressedThisFrame) RescueFromDebug();
-            if (keyboard.f4Key.wasPressedThisFrame && missions != null)
-                for (int i = 0; i < missions.Missions.Count; i++) missions.Missions[i].DebugComplete();
-            if (keyboard.f5Key.wasPressedThisFrame && missions != null)
-                for (int i = 0; i < missions.Missions.Count; i++) if (!missions.Missions[i].Complete) { missions.Missions[i].Fail(); break; }
-            if (keyboard.f6Key.wasPressedThisFrame) CycleDetection();
-            if (keyboard.f7Key.wasPressedThisFrame) AddSuspicion();
-            if (keyboard.f8Key.wasPressedThisFrame) authority.Clock.Paused = !authority.Clock.Paused;
-            if (keyboard.f9Key.wasPressedThisFrame) authority.DebugAdvance(60);
-            if (keyboard.f10Key.wasPressedThisFrame) CycleLighting();
-            if (keyboard.f11Key.wasPressedThisFrame) CycleGuard();
-            if (keyboard.f12Key.wasPressedThisFrame) guardController.DebugVision = !guardController.DebugVision;
             if (keyboard.tKey.wasPressedThisFrame && guardController.Flashlight != null)
                 guardController.Flashlight.SetEnabled(!guardController.Flashlight.Model.Enabled);
-            if (keyboard.digit1Key.wasPressedThisFrame) SpawnCrate();
-            if (keyboard.homeKey.wasPressedThisFrame) authority.DebugAdvance(authority.Clock.Remaining);
-            if (keyboard.endKey.wasPressedThisFrame) authority.DebugForce(MatchPhase.Victory);
-            if (keyboard.deleteKey.wasPressedThisFrame) authority.DebugForce(MatchPhase.Defeat);
-            if (hud != null) hud.Show(BuildHud());
+            foreach (var binding in DebugKeys)
+                if (keyboard[binding.Key].wasPressedThisFrame) RunDebug(binding.Key);
+            if (hud != null) hud.Show(BuildStatus(), BuildPrompt(), BuildHelp());
+        }
+        /// <summary>Letter and number keys only: Mac keyboards send F1-F12 as media keys and lack Home/End/Delete.</summary>
+        private static readonly (Key Key, string Label, string Action)[] DebugKeys =
+        {
+            (Key.H, "H", "show / hide controls"),
+            (Key.C, "C", "capture me"),
+            (Key.R, "R", "rescue captured players"),
+            (Key.M, "M", "complete all missions"),
+            (Key.N, "N", "fail a mission"),
+            (Key.J, "J", "next detection level"),
+            (Key.K, "K", "add suspicion"),
+            (Key.P, "P", "pause the clock"),
+            (Key.F, "F", "skip 60 seconds"),
+            (Key.L, "L", "next lighting mode"),
+            (Key.B, "B", "next guard state"),
+            (Key.O, "O", "show guard vision"),
+            (Key.Digit1, "1", "spawn a crate"),
+            (Key.Digit8, "8", "skip to dawn"),
+            (Key.Digit9, "9", "force victory"),
+            (Key.Digit0, "0", "force defeat"),
+        };
+        private void RunDebug(Key key)
+        {
+            switch (key)
+            {
+                case Key.H: help = !help; break;
+                case Key.C:
+                    if (Player != null && authority.TryCapture(Player.Record.Id))
+                        Player.Teleport(new Vector3(-13.2f + authority.Warehouse.Count * 0.9f, 0.1f, 11));
+                    break;
+                case Key.R: RescueFromDebug(); break;
+                case Key.M:
+                    if (missions != null) for (int i = 0; i < missions.Missions.Count; i++) missions.Missions[i].DebugComplete();
+                    break;
+                case Key.N:
+                    if (missions != null)
+                        for (int i = 0; i < missions.Missions.Count; i++) if (!missions.Missions[i].Complete) { missions.Missions[i].Fail(); break; }
+                    break;
+                case Key.J: CycleDetection(); break;
+                case Key.K: AddSuspicion(); break;
+                case Key.P: authority.Clock.Paused = !authority.Clock.Paused; break;
+                case Key.F: authority.DebugAdvance(60); break;
+                case Key.L: CycleLighting(); break;
+                case Key.B: CycleGuard(); break;
+                case Key.O: guardController.DebugVision = !guardController.DebugVision; break;
+                case Key.Digit1: SpawnCrate(); break;
+                case Key.Digit8: authority.DebugAdvance(authority.Clock.Remaining); break;
+                case Key.Digit9: authority.DebugForce(MatchPhase.Victory); break;
+                case Key.Digit0: authority.DebugForce(MatchPhase.Defeat); break;
+            }
         }
         private void ToggleSurveillance()
         {
@@ -331,53 +364,94 @@ namespace NightSupermarket.Game
             if (guardView != null) { guardView.Active = driving; guardView.View.gameObject.SetActive(driving); }
             if (guardVisual != null) guardVisual.SetFirstPerson(driving);
         }
-        private string BuildHud()
+        private string BuildStatus()
         {
-            if (active == pawns.Count)
-            {
-                var builderGuard = new StringBuilder();
-                int guardSeconds = Mathf.CeilToInt((float)authority.Clock.Remaining);
-                builderGuard.Append("NIGHT SUPERMARKET  ").Append(guardSeconds / 60).Append(':').Append((guardSeconds % 60).ToString("00"));
-                builderGuard.Append("\nPlaying the GUARD. Same vision, hearing, and detection as the AI.\n");
-                builderGuard.Append("WASD look with the mouse. Tab returns to a mannequin.\n");
-                if (help) builderGuard.Append("F1 help  F8 pause  F9 +60s  F10 light  F11 guard state  T flashlight");
-                return builderGuard.ToString();
-            }
-            var pawn = pawns[active];
             var builder = new StringBuilder();
             int seconds = Mathf.CeilToInt((float)authority.Clock.Remaining);
-            builder.Append("NIGHT SUPERMARKET  ").Append(seconds / 60).Append(':').Append((seconds % 60).ToString("00"));
-            if (authority.Clock.Paused) builder.Append("  PAUSED");
-            builder.Append("\nPhase ").Append(authority.Flow.Phase).Append("  Player ").Append(active + 1).Append("  ").Append(pawn.Motor.Record.State);
-            builder.Append("  Pose ").Append(pawn.Pose.Pose).Append('\n');
+            builder.Append("<b>NIGHT SUPERMARKET</b>   ").Append(seconds / 60).Append(':').Append((seconds % 60).ToString("00"));
+            if (authority.Clock.Paused) builder.Append("  <color=#FFD54A>PAUSED</color>");
+            if (authority.Flow.Phase != MatchPhase.Night) builder.Append("  <color=#FFD54A>").Append(authority.Flow.Phase.ToString().ToUpperInvariant()).Append("</color>");
+            builder.Append('\n');
+            if (active == pawns.Count)
+            {
+                builder.Append("You are the <b>GUARD</b>   state ").Append(guardController.Brain.State).Append('\n');
+                builder.Append("<size=16>Same eyes and ears as the AI guard.</size>");
+                return builder.ToString();
+            }
+            var pawn = pawns[active];
+            builder.Append("Mannequin ").Append(active + 1).Append("   ").Append(pawn.Motor.Record.State).Append('\n');
             if (pawn.Detection != null)
-                builder.Append("Detection ").Append(pawn.Detection.Detection.State).Append("   Suspicion ").Append(pawn.Detection.Detection.Suspicion.Value).Append('\n');
-            builder.Append(pawn.Probe.Prompt).Append('\n');
+            {
+                var detection = pawn.Detection.Detection;
+                builder.Append("Seen <color=").Append(DetectionColor(detection.State)).Append('>').Append(detection.State.ToString().ToUpperInvariant())
+                       .Append("</color>   suspicion ").Append(detection.Suspicion.Value).Append('\n');
+            }
             if (missions != null)
                 for (int i = 0; i < missions.Missions.Count; i++)
                 {
                     var mission = missions.Missions[i];
-                    builder.Append(mission.Rule.Title).Append("  ").Append(mission.Progress).Append('/').Append(mission.Rule.Quantity);
-                    if (mission.Failed) builder.Append("  FAILED");
-                    builder.Append('\n');
+                    builder.Append(mission.Complete ? "<color=#7CE38B>[x]</color> " : mission.Failed ? "<color=#FF6B5E>[!]</color> " : "[ ] ");
+                    builder.Append(mission.Rule.Title).Append("  ").Append(mission.Progress).Append('/').Append(mission.Rule.Quantity).Append('\n');
                 }
-            builder.Append("Inventory ");
-            foreach (var pair in pawn.Inventory.Items.Snapshot()) builder.Append(pair.Key).Append('x').Append(pair.Value).Append(' ');
-            builder.Append("\nWarehouse ").Append(authority.Warehouse.Count).Append("   Escaped ").Append(authority.Escapes.Count);
-            builder.Append("   Guard ").Append(guardController.Brain.State).Append("   Light ").Append(authority.Lighting.Mode).Append('\n');
+            var items = pawn.Inventory.Items.Snapshot();
+            bool carrying = false;
+            foreach (var pair in items)
+            {
+                builder.Append(carrying ? ", " : "Carrying ").Append(pair.Key).Append(" x").Append(pair.Value);
+                carrying = true;
+            }
+            if (carrying) builder.Append('\n');
+            builder.Append("<size=16>Warehouse ").Append(authority.Warehouse.Count).Append("   escaped ").Append(authority.Escapes.Count)
+                   .Append("   lights ").Append(authority.Lighting.Mode).Append("</size>");
             if (pawn.Motor.Record.State == PlayerState.Surveillance && authority.TryReadSurveillance(pawn.Motor.Record.Id, pawn.Motor.Record.Id, out var view))
             {
-                builder.Append("SURVEILLANCE  guard ").Append(view.GuardState).Append(" @ ").Append(view.GuardPosition.X.ToString("0")).Append(',').Append(view.GuardPosition.Z.ToString("0")).Append('\n');
-                for (int i = 0; i < view.Players.Count; i++)
-                    builder.Append("man ").Append(i + 1).Append(' ').Append(view.Players[i].State).Append('\n');
+                builder.Append("\n<color=#7CE3B0>CAMERAS</color>  guard ").Append(view.GuardState).Append(" at ")
+                       .Append(view.GuardPosition.X.ToString("0")).Append(", ").Append(view.GuardPosition.Z.ToString("0"));
+                for (int i = 0; i < view.Players.Count; i++) builder.Append("\nMannequin ").Append(i + 1).Append(' ').Append(view.Players[i].State);
             }
-            if (help) builder.Append("Tab mannequin/guard  V surveillance  F1 help  F2 capture  F3 rescue  F4 complete  F5 fail\nF6 detection  F7 suspicion  F8 pause  F9 +60s  F10 light  F11 guard  Home dawn  End win  Del lose");
             return builder.ToString();
         }
+        private static string DetectionColor(DetectionState state) => state switch
+        {
+            DetectionState.Green => "#7CE38B",
+            DetectionState.Orange => "#FFB347",
+            DetectionState.Red => "#FF6B5E",
+            _ => "#FF3B3B"
+        };
+        private string BuildPrompt()
+        {
+            if (Cursor.lockState != CursorLockMode.Locked && authority.Flow.Phase == MatchPhase.Night) return "Click to play";
+            if (active == pawns.Count) return "";
+            var pawn = pawns[active];
+            if (pawn.Motor.Record.State == PlayerState.Captured) return "Captured. V to watch the cameras. A teammate can free you at the release panel.";
+            return pawn.Probe.Prompt;
+        }
+        private string BuildHelp()
+        {
+            if (!help) return "<b><color=#FFD54A>H</color></b>  controls";
+            var builder = new StringBuilder();
+            builder.Append("<b>CONTROLS</b>\n");
+            Line(builder, "WASD", "move");
+            Line(builder, "Mouse", "look");
+            Line(builder, "Shift", "run");
+            Line(builder, "Space", "jump");
+            Line(builder, "E", "use / pick up");
+            Line(builder, "G / Q", "drop / throw");
+            Line(builder, "Tab", "switch mannequin / guard");
+            Line(builder, "V", "security cameras (captured)");
+            Line(builder, "T", "guard flashlight");
+            Line(builder, "Esc", "free the mouse");
+            builder.Append("\n<b>TESTING</b>\n");
+            foreach (var binding in DebugKeys) Line(builder, binding.Label, binding.Action);
+            builder.Length--;
+            return builder.ToString();
+        }
+        private static void Line(StringBuilder builder, string key, string action) =>
+            builder.Append("<color=#FFD54A><b>").Append(key).Append("</b></color>\t").Append(action).Append('\n');
         private void OnGUI()
         {
             if (authority == null || pawns.Count == 0 || (hud != null && hud.Ready)) return;
-            GUI.Label(new Rect(16, 16, 900, 500), BuildHud());
+            GUI.Label(new Rect(16, 16, 520, 400), BuildStatus() + "\n" + BuildPrompt());
         }
         private void OnDestroy()
         {

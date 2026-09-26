@@ -70,7 +70,7 @@ Gameplay does not depend on art. The primitives keep every collider and rule;
 The prototype scene is the local night loop: two mannequins, one guard body,
 collect/place objectives, an employee door, warehouse rescue and an escape door.
 Tab switches mannequins and then the guard. The guard uses the same eyes either
-way. F1 lists debug keys. This is hot-seat authority, not online multiplayer.
+way. H lists every control and testing key (letters and numbers only, since Mac keyboards send F1-F12 as media keys). This is hot-seat authority, not online multiplayer.
 Photon Fusion 2.0.13 and PlayFab both require account downloads that are not in
 this repo.
 

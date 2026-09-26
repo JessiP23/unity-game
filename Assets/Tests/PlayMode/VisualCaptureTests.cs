@@ -73,6 +73,21 @@ namespace NightSupermarket.Tests.PlayMode
                     Save(rig, texture, pixels, Path.Combine(folder, mood.name + ".png"));
                 }
                 LightingPresenter.Apply(LightingMode.Normal);
+                var hud = GameObject.Find("Prototype HUD");
+                if (hud != null)
+                {
+                    var canvas = hud.GetComponent<Canvas>();
+                    canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = rig; canvas.planeDistance = 0.5f;
+                    rig.transform.position = new Vector3(-2.5f, 1.6f, -6); rig.transform.LookAt(new Vector3(-2.5f, 1.4f, 6));
+                    for (int i = 0; i < 3; i++) yield return null;
+                    Save(rig, texture, pixels, Path.Combine(folder, "hud.png"));
+                    var help = typeof(PrototypeRoot).GetField("help", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    help?.SetValue(root, true);
+                    for (int i = 0; i < 3; i++) yield return null;
+                    Save(rig, texture, pixels, Path.Combine(folder, "hud_controls.png"));
+                    help?.SetValue(root, false);
+                    canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                }
             }
             finally
             {

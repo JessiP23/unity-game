@@ -11,7 +11,7 @@ captured, rescue a teammate, finish the crate objectives and escape before dawn.
 Online Fusion and PlayFab are not connected yet. See
 [phase status](Documentation/phase-status.md).
 
-Open the prototype scene and press Play. Tab switches mannequins, then the guard. F1 shows debug keys.
+Open the prototype scene and press Play. Tab switches mannequins, then the guard. H shows every control and testing key.
 
 ```sh
 python3 Tools/unity.py open
