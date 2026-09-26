@@ -11,9 +11,8 @@ namespace NightSupermarket.Editor
     {
         public const string ScenePath = "Assets/Scenes/Bootstrap/Bootstrap.unity";
 
-        public static Scene CreateScene()
+        public static void PopulateScene(Scene scene)
         {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
             var camera = new GameObject("Bootstrap Camera", typeof(Camera), typeof(AudioListener));
             SceneManager.MoveGameObjectToScene(camera, scene);
             camera.tag = "MainCamera";
@@ -22,7 +21,6 @@ namespace NightSupermarket.Editor
             SceneManager.MoveGameObjectToScene(light, scene);
             light.GetComponent<Light>().type = LightType.Directional;
             light.transform.rotation = Quaternion.Euler(50, -30, 0);
-            return scene;
         }
 
         [MenuItem("Night Supermarket/Setup/Create Bootstrap Scene")]
@@ -34,7 +32,10 @@ namespace NightSupermarket.Editor
                 return;
             }
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
-            var scene = CreateScene();
+            if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            PopulateScene(scene);
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 throw new IOException("Could not save bootstrap scene.");
             AssetDatabase.Refresh();

@@ -1,0 +1,2177 @@
+You are the lead engineer responsible for building a complete multiplayer
+Unity game prototype from scratch.
+
+PROJECT NAME:
+Night Supermarket
+
+IMPORTANT:
+I am starting from ZERO. I currently have no 3D assets, no characters,
+no environment, no animations, no audio, and no art pipeline.
+
+DO NOT focus on art or asset acquisition yet.
+
+Your first objective is to build the ENTIRE PROGRAMMING FOUNDATION and
+gameplay systems using Unity primitives, placeholder objects, procedural/
+generated test objects, and mock implementations where appropriate.
+
+The programming must be modular enough that real assets can be plugged in
+later without rewriting the gameplay systems.
+
+The game should eventually become a polished multiplayer cooperative
+stealth game, but right now we are building the engineering foundation.
+
+Do not skip systems just because they are not visually interesting.
+
+Do not create a giant monolithic GameManager.
+
+Do not create fragile scripts where every system directly depends on every
+other system.
+
+Prefer modular, testable, deterministic systems with clear interfaces.
+
+============================================================
+1. GAME CONCEPT
+============================================================
+
+The game takes place inside a supermarket at night after closing.
+
+Several players play as mannequins.
+
+One player may play as a security guard, OR the guard may be controlled
+by AI.
+
+The core mechanic:
+
+MANNEQUINS CAN MOVE WHEN THEY ARE NOT BEING OBSERVED.
+
+WHEN A GUARD LOOKS AT A MANNEQUIN:
+
+GREEN:
+Nobody is currently observing the mannequin.
+The mannequin can move freely.
+
+ORANGE:
+The guard has started looking at the mannequin.
+The mannequin has a configurable amount of time to stop moving.
+
+RED:
+The mannequin is fully observed.
+The mannequin must remain completely still.
+
+If the mannequin moves while RED:
+
+1. suspicion increases by +1
+2. continued movement increases suspicion further
+3. if the mannequin continues moving after reaching the discovery
+   threshold, the mannequin is DISCOVERED.
+
+A discovered player does NOT die.
+
+Instead:
+
+MANNEQUIN
+    ↓
+CAPTURED
+    ↓
+WAREHOUSE
+
+Captured players can potentially be rescued.
+
+Captured players may also gain access to the surveillance/security room
+and provide information to their teammates.
+
+This means being captured does not necessarily remove the player from
+the entire game.
+
+============================================================
+2. PRIMARY GAME LOOP
+============================================================
+
+The complete game loop should eventually be:
+
+LOBBY
+    ↓
+GAME START
+    ↓
+NIGHT BEGINS
+    ↓
+PLAYERS RECEIVE OBJECTIVES
+    ↓
+PLAYERS EXPLORE SUPERMARKET
+    ↓
+PLAYERS COMPLETE OBJECTIVES
+    ↓
+GUARD PATROLS / INVESTIGATES
+    ↓
+GUARD OBSERVES MANNEQUINS
+    ↓
+MANNEQUINS FREEZE
+    ↓
+PLAYERS MANAGE RISK
+    ↓
+SOME PLAYERS MAY GET CAPTURED
+    ↓
+CAPTURED PLAYERS ENTER WAREHOUSE
+    ↓
+OTHER PLAYERS CAN RESCUE THEM
+    ↓
+OBJECTIVES COMPLETED
+    ↓
+PLAYERS FIND ESCAPE ROUTE
+    ↓
+PLAYERS ESCAPE
+    ↓
+WIN
+
+LOSS CONDITIONS:
+
+1. All mannequin players are discovered/captured and no rescue/escape
+   condition remains.
+
+2. Dawn occurs before the required escape condition is completed.
+
+The rules must be configurable rather than hardcoded.
+
+============================================================
+3. ENGINE / TECHNOLOGY
+============================================================
+
+Target:
+
+Unity 6
+C#
+PC / Windows initially
+URP
+
+Use modern Unity architecture where appropriate.
+
+Use:
+
+- Unity Input System
+- Unity Physics
+- Unity AI Navigation / NavMesh
+- TextMeshPro
+- Unity Test Framework
+
+Networking target:
+
+Photon Fusion 2.
+
+Backend target:
+
+PlayFab.
+
+However:
+
+DO NOT make the entire project dependent on external backend services
+during the first programming phase.
+
+Create clean abstractions around networking and backend functionality.
+
+The local/offline development environment must remain usable.
+
+Example:
+
+INetworkService
+IPlayerSession
+ILobbyService
+IMatchService
+
+etc.
+
+If Photon is not yet installed, create the interfaces and a mock/local
+implementation so gameplay can be developed and tested.
+
+Do NOT invent Photon APIs.
+
+When Photon is actually integrated, use the current official Fusion 2
+APIs and document exactly what was added.
+
+Similarly, do not invent PlayFab APIs.
+
+============================================================
+4. CORE ARCHITECTURAL PRINCIPLE
+============================================================
+
+The project must follow a clear separation of concerns.
+
+At minimum create systems for:
+
+Player
+Movement
+Camera
+Input
+Interaction
+Inventory
+Physics
+Detection
+Suspicion
+Guard AI
+Guard perception
+Hearing
+Mission
+Objective tracking
+Doors
+Keys
+Lighting
+Game state
+Capture
+Warehouse
+Surveillance
+Rescue
+Escape
+Match flow
+Networking
+UI
+Audio hooks
+Persistence hooks
+Testing/debugging
+
+Do NOT put all of this into one GameManager.
+
+The GameManager should coordinate high-level state only.
+
+Use interfaces, events, data objects, and services where appropriate.
+
+Prefer composition over inheritance when appropriate.
+
+============================================================
+5. PROJECT STRUCTURE
+============================================================
+
+Create a clean project structure.
+
+Suggested:
+
+Assets/
+    Scripts/
+        Core/
+        Game/
+        Player/
+        Guard/
+        Detection/
+        Interaction/
+        Inventory/
+        Missions/
+        World/
+        Lighting/
+        Capture/
+        Rescue/
+        Surveillance/
+        Networking/
+        UI/
+        Audio/
+        Debug/
+        Utilities/
+
+    Prefabs/
+        Players/
+        Guards/
+        Objects/
+        Environment/
+        UI/
+
+    Scenes/
+        Bootstrap/
+        Test/
+        Prototype/
+
+    ScriptableObjects/
+        Missions/
+        Items/
+        Characters/
+        GameRules/
+        Detection/
+        Audio/
+
+    Tests/
+        EditMode/
+        PlayMode/
+
+    Materials/
+    Art/
+    Audio/
+
+Documentation/
+    architecture.md
+    game-design.md
+    networking.md
+    detection.md
+    guard-ai.md
+    missions.md
+    testing.md
+    development.md
+    decisions.md
+
+Do not create unnecessary folders simply for the sake of organization.
+Keep the architecture understandable.
+
+============================================================
+6. CODING STANDARDS
+============================================================
+
+Use:
+
+- clear class names
+- clear method names
+- small responsibilities
+- XML documentation for important public APIs
+- events where appropriate
+- interfaces where they provide real decoupling
+- ScriptableObjects for configurable game data
+- dependency injection where practical without introducing unnecessary
+  frameworks
+
+Avoid:
+
+- static global state unless genuinely justified
+- singleton abuse
+- FindObjectOfType everywhere
+- GameObject.Find everywhere
+- hardcoded object names
+- hardcoded scene paths
+- hardcoded player IDs
+- hardcoded mission logic
+- hardcoded guard behavior
+- hardcoded detection thresholds
+- circular dependencies
+- enormous Update() methods
+- networking logic mixed directly into unrelated gameplay logic
+
+Every important gameplay rule should be configurable.
+
+============================================================
+7. GAME CONFIGURATION
+============================================================
+
+Create a GameRules configuration object.
+
+It should contain configurable values such as:
+
+- match duration
+- dawn time
+- orange detection duration
+- suspicion increment
+- discovery threshold
+- guard vision distance
+- guard field of view
+- guard hearing radius
+- mannequin movement speed
+- mannequin sprint speed
+- jump height
+- interaction distance
+- throw force
+- object pickup rules
+- rescue rules
+- escape rules
+
+Do not scatter magic numbers across the code.
+
+Example:
+
+DetectionConfig
+    orangeDuration
+    suspicionPerMovement
+    discoveryThreshold
+    maxVisionDistance
+    fieldOfView
+
+MovementConfig
+    walkSpeed
+    sprintSpeed
+    jumpForce
+
+etc.
+
+============================================================
+8. PLAYER SYSTEM
+============================================================
+
+Create a Player system that supports:
+
+- walking
+- running
+- jumping
+- looking
+- interaction
+- inventory
+- grabbing
+- dropping
+- throwing
+- pushing
+- object interaction
+- animation hooks
+
+For now, use primitive placeholder geometry.
+
+Example:
+
+Capsule = mannequin placeholder
+Capsule/Cube = guard placeholder
+Cube = object
+Cube = shelf
+Cube = door
+
+The player architecture must not depend on the mannequin actually being
+a mannequin model.
+
+Create a CharacterController or appropriate physics-based controller.
+
+Make movement deterministic enough to behave correctly in multiplayer.
+
+Separate:
+
+Input
+from
+Movement
+from
+Player state
+from
+Networking.
+
+============================================================
+9. PLAYER STATES
+============================================================
+
+Create a state system.
+
+At minimum:
+
+Normal
+Running
+Jumping
+Interacting
+Carrying
+Throwing
+Captured
+Surveillance
+Escaping
+Dead/Inactive if needed by architecture
+
+Do not make "captured" simply destroy the player.
+
+Capture should transition the player into a different gameplay state.
+
+============================================================
+10. INTERACTION SYSTEM
+============================================================
+
+Create a generic interaction architecture.
+
+For example:
+
+IInteractable
+
+Possible implementations:
+
+Pickupable
+Pushable
+Throwable
+Breakable
+Door
+Lock
+Key
+Clothing
+MissionObject
+EscapeObject
+RescueObject
+
+The player should be able to look at an interactable object and receive
+a generic interaction response.
+
+Do not hardcode:
+
+"If object name == RedShirt"
+
+Instead objects should expose their capabilities/data.
+
+============================================================
+11. PHYSICS / OBJECT SYSTEM
+============================================================
+
+Objects should support:
+
+- pickup
+- drop
+- throw
+- push
+- collision
+- break
+- placement
+
+The system should distinguish between:
+
+STATIC
+PUSHABLE
+PICKUPABLE
+THROWABLE
+BREAKABLE
+
+Create a generic interactable object data model.
+
+Example:
+
+ItemDefinition
+
+ID
+DisplayName
+Category
+Weight
+CanPickup
+CanThrow
+CanBreak
+CanPlace
+MissionTags
+
+Use ScriptableObjects where appropriate.
+
+============================================================
+12. INVENTORY
+============================================================
+
+Create a basic inventory.
+
+Support:
+
+- adding items
+- removing items
+- checking for items
+- item quantities
+- key items
+- quest items
+
+Do not assume every item occupies the same inventory slot.
+
+Keys may behave differently from physical objects.
+
+Make inventory network-ready.
+
+============================================================
+13. DETECTION SYSTEM
+============================================================
+
+THIS IS THE MOST IMPORTANT SYSTEM IN THE GAME.
+
+Create a dedicated DetectionSystem.
+
+Do not bury detection inside GuardController.
+
+Detection should determine whether a mannequin is currently being observed.
+
+The system must consider:
+
+1. distance
+2. field of view
+3. line of sight
+4. obstacles
+5. guard orientation
+6. potentially lighting later
+7. guard flashlight later
+
+Use raycasts/occlusion checks.
+
+Create:
+
+DetectionState:
+
+GREEN
+ORANGE
+RED
+DISCOVERED
+
+Transitions:
+
+GREEN → ORANGE
+ORANGE → GREEN
+ORANGE → RED
+RED → GREEN
+RED → DISCOVERED
+
+The exact transition behavior must be configurable.
+
+============================================================
+14. ORANGE STATE
+============================================================
+
+When the guard begins observing the player:
+
+GREEN
+    ↓
+ORANGE
+
+The player gets a configurable grace period.
+
+Example:
+
+ORANGE_DURATION = 1.5 seconds
+
+During ORANGE:
+
+- show warning UI
+- play appropriate warning audio hook
+- player can still move
+- timer counts down
+
+If player leaves line of sight:
+
+ORANGE → GREEN
+
+If player remains observed:
+
+ORANGE → RED
+
+============================================================
+15. RED STATE
+============================================================
+
+RED means:
+
+THE PLAYER IS FULLY OBSERVED.
+
+The player should remain still.
+
+If the player moves:
+
+suspicion += configured amount
+
+Do NOT simply detect keyboard input.
+
+Movement should be measured from actual player movement/state so that
+physics/networking cannot accidentally create false positives.
+
+Possible configurable definition:
+
+Movement threshold = X centimeters per second.
+
+Tiny network jitter must not count as movement.
+
+============================================================
+16. SUSPICION
+============================================================
+
+Create a dedicated SuspicionSystem.
+
+Example:
+
+RED
+player moves
+    ↓
+suspicion + 1
+
+If movement continues:
+
+suspicion + 1
+suspicion + 1
+suspicion + 1
+
+At discovery threshold:
+
+DISCOVERED
+
+Make suspicion:
+
+- network synchronized
+- server authoritative
+- configurable
+- visible to UI
+- testable independently
+
+Do not use floating-point accumulation if integer suspicion is the intended
+game mechanic.
+
+============================================================
+17. DISCOVERY
+============================================================
+
+When a player reaches the discovery threshold:
+
+DetectionState = DISCOVERED
+
+Then:
+
+Player
+    ↓
+Captured
+    ↓
+Warehouse
+
+Do not destroy the player's network identity.
+
+The player remains part of the match.
+
+Create an explicit CaptureSystem.
+
+============================================================
+18. CAPTURE / WAREHOUSE
+============================================================
+
+Create:
+
+CaptureSystem
+WarehouseSystem
+
+Captured players:
+
+- cannot participate normally
+- are moved/assigned to warehouse
+- retain their identity
+- may observe information
+- may interact with rescue mechanics
+- may eventually return to normal gameplay
+
+Do not implement this as simply disabling the player GameObject.
+
+Use state transitions.
+
+============================================================
+19. SURVEILLANCE ROOM
+============================================================
+
+Create the architecture for a surveillance/security room.
+
+A captured player can potentially access surveillance information.
+
+Initially implement a basic debug/test version.
+
+Possible information:
+
+- guard location
+- guard state
+- last known mannequin location
+- captured player locations
+- objective state
+- lighting state
+- doors
+- alarms/noise events
+
+Do not implement fancy cameras yet.
+
+The important thing is the underlying information system.
+
+Create:
+
+SurveillanceSystem
+
+that consumes world/game events and exposes appropriate information.
+
+============================================================
+20. RESCUE SYSTEM
+============================================================
+
+Create:
+
+RescueSystem
+
+Potential flow:
+
+Free mannequin
+    ↓
+finds warehouse
+    ↓
+interacts with rescue mechanism
+    ↓
+warehouse player released
+    ↓
+player returns to normal state
+
+Rules must be configurable.
+
+Test:
+
+- rescue one player
+- rescue multiple players
+- attempt rescue when invalid
+- rescue after game state changes
+
+============================================================
+21. GUARD SYSTEM
+============================================================
+
+Guard must be independent of detection.
+
+Create:
+
+GuardController
+
+GuardStateMachine
+
+States:
+
+PATROL
+INVESTIGATE
+SEARCH
+CHASE
+CAPTURE
+RETURN_TO_PATROL
+
+Use a state machine.
+
+Do not create an enormous switch statement containing all guard logic.
+
+============================================================
+22. GUARD PATROL
+============================================================
+
+Create patrol points.
+
+Guard should:
+
+- navigate between points
+- wait optionally
+- rotate/look around
+- continue patrol
+
+Use Unity NavMesh.
+
+Create configurable patrol behavior.
+
+============================================================
+23. GUARD INVESTIGATION
+============================================================
+
+The guard should react to world events.
+
+Examples:
+
+- thrown object
+- broken object
+- loud collision
+- door event
+- suspicious action
+- noise
+
+Create a generic WorldEvent / NoiseEvent system.
+
+Example:
+
+NoiseEvent
+
+position
+loudness
+source
+timestamp
+type
+
+Guard hearing system consumes these events.
+
+============================================================
+24. GUARD HEARING
+============================================================
+
+Create:
+
+GuardHearingSystem
+
+The guard should be able to hear events based on:
+
+distance
+noise intensity
+obstacles if later supported
+guard state
+
+Example:
+
+Player throws object
+    ↓
+NoiseEvent
+    ↓
+Guard hearing
+    ↓
+Investigation target
+    ↓
+Guard moves there
+    ↓
+Search
+
+============================================================
+25. GUARD VISION
+============================================================
+
+Create:
+
+GuardVisionSystem
+
+It should expose:
+
+CanSeeTarget(target)
+
+and preferably a richer result:
+
+VisionResult
+
+- visible
+- distance
+- angle
+- lineOfSight
+- confidence/visibility if useful later
+
+Do not make detection directly dependent on rendering.
+
+Vision is gameplay logic.
+
+============================================================
+26. FLASHLIGHT
+============================================================
+
+Create a FlashlightSystem abstraction.
+
+The first implementation can be a placeholder light.
+
+Support:
+
+- on/off
+- direction
+- range
+- cone
+- battery if desired later
+
+Do not couple flashlight rendering directly to detection.
+
+The detection system should be able to consume flashlight visibility
+information.
+
+============================================================
+27. LIGHTING SYSTEM
+============================================================
+
+Create:
+
+LightingSystem
+
+States:
+
+NORMAL
+DARK
+EMERGENCY
+PARTIAL
+DAWN
+
+Initially this can be represented by debug values rather than actual
+lighting.
+
+Later actual Unity lights can subscribe to LightingSystem state.
+
+This allows the gameplay code to exist before art assets.
+
+============================================================
+28. MISSION SYSTEM
+============================================================
+
+Create a generic MissionSystem.
+
+Missions should be data-driven.
+
+Types:
+
+COLLECT
+MOVE
+PLACE
+BREAK
+STEAL
+UNLOCK
+ESCAPE
+
+Do not hardcode individual mission names.
+
+Example:
+
+MissionDefinition
+
+ID
+Title
+Description
+Type
+Target
+Quantity
+Destination
+RequiredItem
+CompletionCondition
+
+============================================================
+29. EXAMPLE MISSIONS
+============================================================
+
+The system must eventually support:
+
+"Collect 3 red shirts."
+
+"Collect 5 objects."
+
+"Place 3 shirts on mannequins."
+
+"Move the microwave to the storage room."
+
+"Break 3 objects."
+
+"Steal the expensive item."
+
+"Find the warehouse key."
+
+"Find the employee door key."
+
+"Escape the supermarket."
+
+Do not create custom code for each mission.
+
+Use the generic mission framework.
+
+============================================================
+30. OBJECTIVES
+============================================================
+
+Create:
+
+ObjectiveManager
+
+It should track:
+
+- active objectives
+- completed objectives
+- failed objectives
+- optional objectives
+- objective progress
+
+Example:
+
+3 / 5 objects collected
+
+The objective system must emit events when objectives change.
+
+============================================================
+31. DOORS / KEYS
+============================================================
+
+Create generic:
+
+Door
+Lock
+Key
+AccessRequirement
+
+A door should not know about a specific player.
+
+Example:
+
+EmployeeDoor
+requires:
+EmployeeDoorKey
+
+WarehouseDoor
+requires:
+WarehouseKey
+
+SecurityDoor
+requires:
+SecurityKey
+
+Use IDs/tags/data definitions rather than object-name checks.
+
+============================================================
+32. ESCAPE SYSTEM
+============================================================
+
+Create:
+
+EscapeSystem
+
+An escape point can require:
+
+- mission completion
+- key
+- door state
+- specific conditions
+
+When a player escapes:
+
+PlayerState = ESCAPED
+
+The match should evaluate whether the game has been won.
+
+Make the exact win condition configurable.
+
+============================================================
+33. GAME STATE
+============================================================
+
+Create a high-level GameStateMachine.
+
+States:
+
+LOBBY
+STARTING
+NIGHT
+ENDING
+VICTORY
+DEFEAT
+
+Potential future states:
+
+PAUSED
+LOADING
+POST_GAME
+
+GameStateManager should coordinate systems but should NOT contain every
+game mechanic.
+
+============================================================
+34. TIME / DAWN
+============================================================
+
+Create:
+
+GameClock
+
+The clock must support:
+
+- start
+- pause
+- resume
+- elapsed time
+- remaining time
+- dawn threshold
+
+Example:
+
+Night = 15 minutes.
+
+When time expires:
+
+DAWN
+    ↓
+DEFEAT
+
+The duration must be configurable.
+
+============================================================
+35. WIN / LOSS EVALUATION
+============================================================
+
+Create:
+
+MatchOutcomeSystem
+
+It evaluates:
+
+- all players captured?
+- players escaped?
+- required objectives complete?
+- dawn?
+- rescue possible?
+- match ended?
+
+Do not spread win/loss checks across dozens of scripts.
+
+There should be one authoritative place that evaluates the match outcome.
+
+============================================================
+36. MULTIPLAYER ARCHITECTURE
+============================================================
+
+The final game must support:
+
+2+ mannequin players
+1 guard player OR AI guard
+
+Potential future:
+
+multiple guards.
+
+Networking architecture must be server-authoritative.
+
+Important server-authoritative data:
+
+- player position/state where appropriate
+- inventory
+- item ownership
+- object interaction
+- mission progress
+- detection
+- suspicion
+- capture
+- rescue
+- doors
+- keys
+- game clock
+- win/loss
+- guard state
+- world events
+
+Clients should not be trusted to declare:
+
+"I escaped."
+"I completed the mission."
+"I was not seen."
+"I picked up this item."
+"I unlocked this door."
+
+The server/authority validates these actions.
+
+============================================================
+37. NETWORK ABSTRACTION
+============================================================
+
+Do not tightly couple core gameplay logic to Photon.
+
+Separate:
+
+Gameplay logic
+from
+network transport.
+
+Create appropriate abstractions.
+
+The project should be able to run in:
+
+LOCAL_TEST_MODE
+
+before the real multiplayer backend is connected.
+
+Later:
+
+Photon Fusion implementation.
+
+============================================================
+38. PHOTON FUSION INTEGRATION
+============================================================
+
+When implementing Photon:
+
+Use current official Fusion 2 APIs.
+
+Do not guess APIs.
+
+Document:
+
+- network authority model
+- state authority
+- input authority
+- spawning
+- despawning
+- networked properties
+- RPC usage
+- object ownership
+- host/server model
+- reconnect behavior
+
+Only synchronize state that actually needs synchronization.
+
+Do not network every variable unnecessarily.
+
+============================================================
+39. PREDICTION / INTERPOLATION
+============================================================
+
+Player movement should feel responsive.
+
+Use Fusion's recommended approach for:
+
+- input authority
+- prediction
+- reconciliation
+- interpolation
+
+Avoid manually synchronizing transform position every frame.
+
+============================================================
+40. NETWORKED OBJECTS
+============================================================
+
+Objects such as:
+
+- keys
+- doors
+- movable objects
+- mission objects
+- thrown objects
+- breakable objects
+
+must have a clear authority model.
+
+Do not allow clients to create arbitrary authoritative objects.
+
+============================================================
+41. AI GUARD VS PLAYER GUARD
+============================================================
+
+The architecture must support two modes:
+
+AI_GUARD
+PLAYER_GUARD
+
+Both should feed into the same:
+
+Vision
+Hearing
+Detection
+Capture
+Interaction
+
+systems.
+
+Do not create separate game rules for AI guard and player guard.
+
+The only difference should be how the guard receives decisions/input.
+
+============================================================
+42. DEBUG MODE
+============================================================
+
+Create a developer/debug mode.
+
+It should allow:
+
+- spawn player
+- spawn guard
+- teleport
+- complete mission
+- fail mission
+- set detection state
+- set suspicion
+- freeze time
+- advance time
+- toggle lights
+- force guard state
+- spawn objects
+- capture player
+- rescue player
+- trigger dawn
+- trigger victory
+- trigger defeat
+
+This is extremely important during development.
+
+Create a debug UI or keyboard shortcuts.
+
+============================================================
+43. DEBUG VISUALIZATION
+============================================================
+
+Create optional visual debugging for:
+
+Guard FOV
+Vision ray
+Current target
+Hearing radius
+Patrol path
+NavMesh
+Detection state
+Suspicion
+Interaction range
+Mission targets
+Noise events
+
+These should be toggleable.
+
+============================================================
+44. UI
+============================================================
+
+Create placeholder UI only.
+
+Do not spend time on visual design.
+
+UI should show:
+
+Game timer
+Mission list
+Mission progress
+Detection state
+Suspicion
+Interaction prompt
+Inventory
+Capture state
+Escape state
+Game outcome
+
+Use simple TextMeshPro elements.
+
+Later these can be replaced with real UI art.
+
+============================================================
+45. AUDIO ARCHITECTURE
+============================================================
+
+Do not add final audio assets yet.
+
+Create an AudioService interface/hook system.
+
+Events should exist for:
+
+- detection warning
+- detection red
+- suspicion increase
+- discovery
+- capture
+- rescue
+- mission complete
+- guard footsteps
+- object impact
+- breaking
+- door
+- escape
+- dawn
+- victory
+- defeat
+
+Use placeholder/debug sounds only if needed.
+
+============================================================
+46. SAVE / PERSISTENCE
+============================================================
+
+Do not implement complex player progression yet.
+
+Create the abstraction needed for future:
+
+IPlayerDataService
+
+Possible future data:
+
+settings
+statistics
+cosmetics
+unlocks
+profile
+
+Do not mix persistent account data with match state.
+
+============================================================
+47. TESTING REQUIREMENTS
+============================================================
+
+This project must be heavily tested.
+
+Create EditMode tests for pure logic.
+
+Create PlayMode/integration tests for Unity behavior.
+
+At minimum test:
+
+PLAYER:
+
+- movement
+- running
+- jumping
+- movement threshold
+- state transitions
+
+DETECTION:
+
+- target outside FOV = not detected
+- target inside FOV = detected
+- wall blocks vision
+- distance prevents vision
+- ORANGE starts correctly
+- ORANGE expires correctly
+- ORANGE returns to GREEN correctly
+- RED begins correctly
+- movement during RED increases suspicion
+- standing still during RED does not increase suspicion
+- discovery threshold works
+- tiny movement/jitter does not trigger suspicion
+
+SUSPICION:
+
+- +1 per valid movement event
+- threshold
+- reset behavior if appropriate
+- synchronization
+
+GUARD:
+
+- patrol
+- investigate
+- search
+- chase
+- capture
+- return to patrol
+
+INTERACTION:
+
+- pickup
+- drop
+- throw
+- push
+- break
+- invalid interaction
+- interaction range
+
+INVENTORY:
+
+- add
+- remove
+- quantity
+- keys
+- insufficient items
+
+MISSIONS:
+
+- collect
+- move
+- place
+- break
+- steal
+- unlock
+- escape
+- completion
+- failure
+
+DOORS:
+
+- locked
+- unlocked
+- correct key
+- incorrect key
+
+CAPTURE:
+
+- player captured
+- player moved to warehouse state
+- player cannot perform normal movement
+- rescue returns player
+
+GAME:
+
+- timer
+- dawn
+- victory
+- defeat
+- all players captured
+- escape
+
+NETWORK:
+
+- state authority
+- invalid client action
+- item ownership
+- mission authority
+- detection authority
+
+============================================================
+48. TEST-FIRST APPROACH
+============================================================
+
+Before implementing a major system:
+
+1. Explain intended behavior.
+2. Create tests for the behavior.
+3. Implement.
+4. Run tests.
+5. Fix failures.
+6. Document the result.
+
+Do not claim something works without testing it.
+
+If Unity cannot be launched or tests cannot be executed in the environment,
+say exactly what could not be tested.
+
+Never pretend tests passed.
+
+============================================================
+49. PERFORMANCE
+============================================================
+
+The game should eventually support a supermarket with many objects.
+
+Avoid:
+
+- unnecessary Update calls
+- expensive raycasts every frame for every object
+- excessive allocations
+- unnecessary LINQ in hot paths
+- creating/destroying objects repeatedly
+- uncontrolled physics objects
+- broadcasting unnecessary network state
+
+For detection:
+
+Do not raycast every guard against every object every frame if it can be
+optimized.
+
+Use staged filtering:
+
+1. distance
+2. angle/FOV
+3. layer filtering
+4. line-of-sight raycast
+
+Later optimize further if profiling demonstrates the need.
+
+Do not prematurely optimize code that has not been profiled.
+
+============================================================
+50. SECURITY / TRUST MODEL
+============================================================
+
+Assume multiplayer clients can be malicious.
+
+Never trust client claims about:
+
+- item ownership
+- mission completion
+- detection
+- escape
+- capture
+- door access
+
+Server/authority validates important actions.
+
+The architecture should make cheating difficult.
+
+============================================================
+51. ERROR HANDLING
+============================================================
+
+Fail gracefully.
+
+Do not silently swallow exceptions.
+
+Use meaningful logs.
+
+Create categorized logging where useful:
+
+[PLAYER]
+[NETWORK]
+[MISSION]
+[DETECTION]
+[GUARD]
+[GAME]
+[INTERACTION]
+
+Debug logs should be disableable.
+
+============================================================
+52. DOCUMENTATION
+============================================================
+
+Create and maintain:
+
+architecture.md
+game-design.md
+detection.md
+guard-ai.md
+networking.md
+missions.md
+testing.md
+development.md
+decisions.md
+
+Whenever an architectural decision changes, update decisions.md.
+
+Document WHY something was chosen, not just WHAT was chosen.
+
+============================================================
+53. GIT
+============================================================
+
+Assume this project will use GitHub.
+
+Create:
+
+.gitignore
+
+appropriate for Unity.
+
+Do not commit:
+
+Library/
+Temp/
+Logs/
+obj/
+Build/
+UserSettings/
+generated files that should not be committed
+secrets
+API keys
+
+Do not commit Photon/PlayFab secrets.
+
+Create logical commits after meaningful milestones if Git access is
+available.
+
+============================================================
+54. NO SECRETS
+============================================================
+
+Never hardcode:
+
+Photon credentials
+PlayFab credentials
+API keys
+tokens
+passwords
+
+Use environment/configuration mechanisms appropriate for Unity development.
+
+============================================================
+55. PLACEHOLDER ENVIRONMENT
+============================================================
+
+Since I have no assets, build a simple procedural/test supermarket.
+
+Use primitives:
+
+Plane = floor
+Cubes = walls
+Cubes = shelves
+Cubes = tables
+Cubes = boxes
+Capsules = players
+Cubes = doors
+Small cubes = keys/items
+
+Create a basic test supermarket layout.
+
+It should contain:
+
+Entrance
+Main aisles
+Clothing section
+Storage/warehouse
+Employee area
+Security/surveillance room
+Escape door
+
+The environment only needs to be functional.
+
+DO NOT spend time making it beautiful.
+
+============================================================
+56. AUTOMATED TEST SCENARIOS
+============================================================
+
+Create reproducible scenarios.
+
+Scenario 1:
+
+Mannequin is outside guard FOV.
+
+Expected:
+GREEN.
+
+Scenario 2:
+
+Guard turns toward mannequin.
+
+Expected:
+ORANGE.
+
+Scenario 3:
+
+Guard continues observing.
+
+Expected:
+RED.
+
+Scenario 4:
+
+Mannequin remains completely still.
+
+Expected:
+Suspicion does not increase.
+
+Scenario 5:
+
+Mannequin moves during RED.
+
+Expected:
+Suspicion +1.
+
+Scenario 6:
+
+Mannequin keeps moving.
+
+Expected:
+DISCOVERED.
+
+Scenario 7:
+
+Wall is inserted between guard and mannequin.
+
+Expected:
+Vision blocked.
+
+Scenario 8:
+
+Mannequin enters warehouse.
+
+Expected:
+Captured state.
+
+Scenario 9:
+
+Another mannequin rescues captured player.
+
+Expected:
+Captured player returns to normal state.
+
+Scenario 10:
+
+Timer reaches dawn.
+
+Expected:
+DEFEAT.
+
+Scenario 11:
+
+Required objectives complete and player escapes.
+
+Expected:
+VICTORY.
+
+Scenario 12:
+
+All mannequin players are captured.
+
+Expected:
+DEFEAT unless rescue rules explicitly allow another outcome.
+
+============================================================
+57. DEVELOPMENT PHASES
+============================================================
+
+Work in phases.
+
+PHASE 0:
+Project initialization
+
+- Unity project
+- Git
+- folder structure
+- documentation
+- test framework
+- coding conventions
+
+PHASE 1:
+Core framework
+
+- game states
+- configuration
+- event system
+- service abstractions
+- debug utilities
+
+PHASE 2:
+Single-player movement
+
+- input
+- camera
+- movement
+- jump
+- run
+- interaction
+
+PHASE 3:
+Detection prototype
+
+- guard
+- FOV
+- raycast
+- GREEN
+- ORANGE
+- RED
+- suspicion
+- discovery
+
+PHASE 4:
+Interaction
+
+- pickup
+- drop
+- throw
+- push
+- break
+
+PHASE 5:
+Inventory
+
+PHASE 6:
+Mission system
+
+PHASE 7:
+Doors and keys
+
+PHASE 8:
+Guard AI
+
+- patrol
+- hearing
+- investigation
+- search
+- chase
+- capture
+
+PHASE 9:
+Capture / warehouse / surveillance / rescue
+
+PHASE 10:
+Game timer / dawn / win / loss
+
+PHASE 11:
+Multiplayer abstraction
+
+PHASE 12:
+Photon Fusion integration
+
+PHASE 13:
+Multiplayer testing
+
+PHASE 14:
+Performance testing
+
+PHASE 15:
+Final programming cleanup
+
+ONLY AFTER THESE PHASES ARE FUNCTIONALLY COMPLETE SHOULD WE START
+ADDING FINAL ART ASSETS.
+
+============================================================
+58. IMPORTANT: DO NOT SKIP AHEAD
+============================================================
+
+Do not start by generating the entire project in one enormous change.
+
+Work incrementally.
+
+At the beginning of each phase:
+
+1. Explain what will be implemented.
+2. List the files/classes that will be created or modified.
+3. Explain dependencies.
+4. Implement.
+5. Run tests.
+6. Report failures.
+7. Fix failures.
+8. Update documentation.
+9. State what is complete.
+10. State what remains.
+
+Do not proceed to the next major phase if the current phase is broken.
+
+============================================================
+59. IMPORTANT: DO NOT INVENT DEPENDENCIES
+============================================================
+
+If a package is required:
+
+Tell me:
+
+PACKAGE:
+VERSION:
+WHY:
+WHAT SYSTEMS DEPEND ON IT:
+
+Do not silently install random packages.
+
+Do not add third-party dependencies when Unity's built-in functionality
+is sufficient.
+
+For Photon Fusion and PlayFab, use official supported versions/APIs.
+
+============================================================
+60. ASSET-INDEPENDENT ARCHITECTURE
+============================================================
+
+This is critical.
+
+The gameplay code must NOT depend on:
+
+- a specific character mesh
+- a specific animation
+- a specific supermarket model
+- a specific shelf model
+- a specific sound
+- a specific texture
+
+Example:
+
+DetectionSystem should detect an entity implementing the appropriate
+player/target interface.
+
+It should not search for:
+
+"Mannequin.prefab"
+
+PlayerController should not assume:
+
+"this GameObject has a specific Animator."
+
+The final asset can be attached later.
+
+============================================================
+61. ANIMATION ARCHITECTURE
+============================================================
+
+Do not implement final animations yet.
+
+Create hooks/interfaces for:
+
+Idle
+Walk
+Run
+Jump
+Carry
+Throw
+Push
+Freeze
+Captured
+Escape
+
+The gameplay state should drive animation state later.
+
+For now, use debug representations.
+
+============================================================
+62. ART REPLACEMENT STRATEGY
+============================================================
+
+Every placeholder should eventually be replaceable.
+
+For example:
+
+PrototypeMannequin
+    ↓
+RealMannequinPrefab
+
+PrototypeGuard
+    ↓
+RealGuardPrefab
+
+PrototypeShelf
+    ↓
+RealShelfPrefab
+
+The underlying gameplay components should remain.
+
+============================================================
+63. FINAL ACCEPTANCE CRITERIA FOR PROGRAMMING PHASE
+============================================================
+
+Do not declare the programming phase complete until:
+
+- project opens without compilation errors
+- all tests pass
+- prototype supermarket can be loaded
+- player can move
+- player can interact
+- guard can patrol
+- guard can see player
+- GREEN/ORANGE/RED work
+- suspicion works
+- discovery works
+- capture works
+- warehouse state works
+- rescue works
+- surveillance data architecture works
+- inventory works
+- missions work
+- keys work
+- doors work
+- escape works
+- timer works
+- dawn works
+- victory works
+- defeat works
+- debug tools work
+- multiplayer architecture exists
+- Photon integration is tested if dependency is available
+- server-authoritative rules are documented
+- no major system is dependent on final art assets
+- no secrets are committed
+- documentation is current
+
+============================================================
+64. WHAT NOT TO DO
+============================================================
+
+Do NOT:
+
+- spend time searching for art
+- create final character models
+- create final animations
+- create final textures
+- create final UI art
+- create final sound design
+- create cinematic effects
+- build unnecessary backend infrastructure
+- add an LLM to the guard AI
+- create microservices
+- create Kubernetes infrastructure
+- create a custom backend when Photon/PlayFab already solves the problem
+- over-engineer systems before they are needed
+- create a monolithic architecture
+- fake test results
+- claim something works without verifying it
+
+============================================================
+65. HOW I WANT YOU TO WORK
+============================================================
+
+Act as a senior game engineer.
+
+When there is a design ambiguity:
+
+1. Identify it.
+2. Choose the simplest architecture that preserves future flexibility.
+3. Explain the decision briefly.
+4. Implement it.
+
+Do not constantly ask me trivial questions.
+
+Only ask me when a decision materially changes architecture or gameplay.
+
+Prioritize:
+
+1. Correctness
+2. Testability
+3. Multiplayer correctness
+4. Maintainability
+5. Performance
+6. Simplicity
+7. Visual polish
+
+At every stage, favor a working small implementation over a huge
+unfinished implementation.
+
+============================================================
+66. FIRST TASK
+============================================================
+
+DO NOT build the whole game immediately.
+
+Start with PHASE 0.
+
+First inspect the repository/project state.
+
+Then tell me:
+
+1. What exists.
+2. What is missing.
+3. What Unity version/configuration is required.
+4. What packages are required immediately.
+5. What packages can wait.
+6. The proposed folder structure.
+7. The proposed architecture.
+8. The first testable milestone.
+
+Then implement PHASE 0.
+
+After implementation, run whatever tests/checks are available.
+
+Report:
+
+- files created
+- files modified
+- tests run
+- tests passed
+- tests failed
+- known limitations
+- next phase
+
+Do not move to Phase 1 until Phase 0 is in a clean state.
+
+Remember:
+
+THE CURRENT GOAL IS THE COMPLETE PROGRAMMING FOUNDATION.
+
+ART ASSETS COME LATER.
