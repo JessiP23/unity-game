@@ -11,6 +11,7 @@ namespace NightSupermarket.Game
         [Min(1)] public int discoveryThreshold = 3;
         [Min(0.001f)] public float movementThreshold = 0.08f;
         public bool continuedMovementToDiscover = true;
+        [Min(0)] public int inventoryCapacity = 8;
         [Header("Movement")]
         [Min(0.1f)] public float walkSpeed = 3;
         [Min(0.1f)] public float sprintSpeed = 5;

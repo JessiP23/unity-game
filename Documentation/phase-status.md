@@ -7,7 +7,7 @@
 | 2 | Input, movement, camera | Passed: movement PlayMode test |
 | 3 | Vision, detection, suspicion | Passed: 13 EditMode, 3 PlayMode total |
 | 4 | Physical object interaction | Passed: 4 PlayMode total; push wired, dedicated coverage pending |
-| 5 | Inventory | Pending |
+| 5 | Inventory | Passed: 16 EditMode total |
 | 6 | Missions | Pending |
 | 7 | Keys and doors | Pending |
 | 8 | Guard AI and hearing | Pending |

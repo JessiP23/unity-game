@@ -17,7 +17,15 @@ namespace NightSupermarket.Game
         { Definition = definition; signals = world; Body = GetComponent<Rigidbody>(); Body.mass = definition.mass; }
         public bool TryInteract(PlayerMotor player)
         {
-            if (Broken || Holder != null || !Definition.canPickup || !InteractionValidation.CanReach(player, transform)) return false;
+            if (!gameObject.activeInHierarchy || Broken || Holder != null || !Definition.canPickup || !InteractionValidation.CanReach(player, transform)) return false;
+            if (Definition.inventoryOnly)
+            {
+                var inventory = player.GetComponent<PlayerInventory>();
+                if (inventory == null || !inventory.Items.TryAdd(Definition.id, 1, Definition.slotCost)) return false;
+                LastActor = player.Record.Id;
+                signals.Actions.Publish(new ObjectAction(ActionKind.Collect, Id, Definition.missionTag, LastActor));
+                gameObject.SetActive(false); return true;
+            }
             var carry = player.GetComponent<CarrySystem>();
             if (carry == null || !carry.TryHold(this)) return false;
             LastActor = player.Record.Id;

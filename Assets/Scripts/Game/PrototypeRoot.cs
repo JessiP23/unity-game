@@ -19,6 +19,7 @@ namespace NightSupermarket.Game
             actor.transform.position = new Vector3(0, 0.1f, -11);
             Player = actor.AddComponent<PlayerMotor>(); Player.Configure(rules, new PlayerRecord(new LocalSession().Join()));
             actor.AddComponent<CarrySystem>().Configure(Player);
+            actor.AddComponent<PlayerInventory>().Configure(rules.inventoryCapacity);
             input = actor.AddComponent<PlayerInputReader>();
             var view = actor.AddComponent<PlayerView>(); view.Configure(Player);
             interaction = actor.AddComponent<InteractionProbe>(); interaction.Configure(Player, view);

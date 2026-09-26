@@ -34,3 +34,6 @@ PlayMode: 2 passed; walk and sprint displacement, jump elevation, and captured m
 
 ## Phase 4
 4 PlayMode passed. Added range rejection, pickup ownership, drop, thrown velocity and break-threshold checks. Pushing is implemented but needs dedicated physics coverage before final acceptance.
+
+## Phase 5
+16 EditMode passed. Inventory tests cover capacity, quantities, zero-slot keys, invalid operations and independent read-only snapshots.
