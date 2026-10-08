@@ -48,7 +48,8 @@ namespace NightSupermarket.Game
             if (textMaterial == null)
             {
                 var template = Resources.Load<Material>("Materials/WorldText");
-                textMaterial = template != null ? new Material(template) : new Material(font.material);
+                var depthTested = Resources.Load<Shader>("WorldLabel");
+                textMaterial = template != null ? new Material(template) : depthTested != null ? new Material(depthTested) : new Material(font.material);
                 textMaterial.mainTexture = font.material.mainTexture;
                 Font.textureRebuilt += rebuilt => { if (rebuilt == font && textMaterial != null) textMaterial.mainTexture = rebuilt.material.mainTexture; };
             }

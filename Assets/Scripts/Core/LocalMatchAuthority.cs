@@ -104,6 +104,17 @@ namespace NightSupermarket.Core
             player.SetState(PlayerState.Surveillance);
             return true;
         }
+        /// <summary>Releases a captive who cleared the back hall. Teammate rescue stays on the warehouse console.</summary>
+        public bool TryFinishBackroom(string playerId)
+        {
+            var player = Find(playerId);
+            if (Flow.Phase != MatchPhase.Night || player == null || !player.InBackroom) return false;
+            if (player.State != PlayerState.Captured && player.State != PlayerState.Surveillance) return false;
+            if (!Warehouse.Release(playerId)) return false;
+            player.SetState(PlayerState.Normal);
+            ApplyOutcome();
+            return true;
+        }
         public bool TryLeaveSurveillance(string connection, string playerId)
         {
             if (!Session.CanControl(connection, playerId)) return false;

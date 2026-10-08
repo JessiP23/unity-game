@@ -9,6 +9,8 @@ namespace NightSupermarket.Game
     public sealed class PlayerInputReader : MonoBehaviour
     {
         public bool Active { get; set; } = true;
+        /// <summary>Right mouse held: the body freezes into the selected pose. Read by the root, not the motor.</summary>
+        public bool PoseHeld => Active && Cursor.lockState == CursorLockMode.Locked && Mouse.current != null && Mouse.current.rightButton.isPressed;
         private bool jump;
         private PlayerCommand? submitted;
         /// <summary>Supplies the next tick's command from a remote client or test; takes priority over the keyboard.</summary>

@@ -31,12 +31,14 @@ namespace NightSupermarket.Core
         public double CalmRatio { get; set; } = 0.45;
         /// <summary>Seconds an observer keeps watching a spot after losing sight before forgetting it.</summary>
         public double ForgetTime { get; set; } = 2.5;
+        /// <summary>A blink of cover does not restart the notice timer. Suspicion still only rises while seen.</summary>
+        public double GlanceHold { get; set; } = 0.35;
         public void Validate()
         {
             GameRules.RequirePositive(Threshold, nameof(Threshold));
             GameRules.RequirePositive(SuspicionGain, nameof(SuspicionGain));
             if (MovementThreshold < 0 || NoticeTime < 0 || SuspicionDecay < 0 || StillDecay < 0 || Sensitivity < 0 ||
-                ReactionTime < 0 || ReportDelay < 0 || ForgetTime < 0 || CalmRatio < 0 || CalmRatio >= 1)
+                ReactionTime < 0 || ReportDelay < 0 || ForgetTime < 0 || GlanceHold < 0 || CalmRatio < 0 || CalmRatio >= 1)
                 throw new ArgumentOutOfRangeException(nameof(AwarenessSettings));
         }
     }
@@ -78,7 +80,8 @@ namespace NightSupermarket.Core
             }
             else
             {
-                watched = 0; unseen += delta;
+                unseen += delta;
+                if (unseen >= settings.GlanceHold) watched = 0;
                 Suspicion -= settings.SuspicionDecay * delta;
             }
             Suspicion = Math.Max(0, Math.Min(settings.Threshold * 1.5, Suspicion));

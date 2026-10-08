@@ -20,6 +20,7 @@ namespace NightSupermarket.Core
         public bool Failed { get; private set; }
         public bool Complete => !Failed && Progress >= Rule.Quantity;
         private readonly HashSet<string> objects = new HashSet<string>();
+        public bool HasCounted(string objectId) => objects.Contains(objectId);
         public event Action Changed;
         public MissionTracker(MissionRule rule) { Rule = rule; }
         /// <summary>Consumes accepted authority events, never client claims.</summary>

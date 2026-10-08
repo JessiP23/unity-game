@@ -33,3 +33,40 @@
 25. Restricted zones are a NavMesh area customers are masked out of, plus zone access filtering on destinations. No rule checks for a specific room by name.
 26. Heard or reported investigations start the guard's path immediately. Before this, a guard standing at the end of its previous path counted as already arrived and searched where it stood.
 27. Players start among posed display mannequins in Clothing. The shirt mission sends them through the crowd, and the grade rewards nights with no reports.
+
+## Detection and guidance review — 2026-10-01
+- Preserve existing working-tree improvements; repair the live implementation.
+- Remove proximity time scaling and observation persistence instead of hiding
+  inconsistent geometry with stronger punishments. Fixed grace is teachable.
+- Two bounded body samples trade at most one extra occlusion ray for reliable
+  partial cover; early distance/FOV rejection and shared guard samples control cost.
+- Separate NPC memory from current sight in HUD copy. Keep reporting distinct
+  from the guard's green/orange/red rules.
+- Guidance is a stable compass bearing with explicit left/right/turn-around text,
+  metres, and a downward destination marker. It does not promise a walkable path.
+- Guide only toward uncounted objective items and then the escape; hide pickup
+  guidance while captured. Register active items instead of querying the scene
+  every frame, reuse tick/surveillance buffers and refresh HUD content at 10Hz.
+- Replayability proposals are in stealth-loop-improvements.md. They require human
+  playtesting; no retention or rendered-FPS improvement is claimed from batch tests.
+
+## 2026-10-02 — Small optional risks around the mannequin loop
+
+The default night is six minutes. Required missions still gate escape; two
+promotional swaps are optional, each worth one grade penalty offset on victory.
+Four seconds of still work and noise at the start make the exposed route a
+choice. Progress cancels on movement, loss of reach or capture, and completion
+is shared and paid once per stand.
+
+Display camouflage is an explicit E interaction requiring a shirt and empty
+hands. Its benefit is one visible two-second extension of the next guard
+sighting's grace period. The player can leave during that earned window;
+reposing while still seen cannot extend it. This keeps moving/freeze decisions
+and witnesses' memories intact. It uses existing character presentation rather
+than adding a new clothing rig or animation asset.
+
+A three-second delayed bell uses existing guard hearing, with an eighteen-second
+shared cooldown and a spatial tone. It does not override an active chase.
+Captured players get bell/console map markers and guard distance to help time
+an existing rescue. These systems run in the current local/host prototype;
+remote command transport and replication remain the networking phase's work.

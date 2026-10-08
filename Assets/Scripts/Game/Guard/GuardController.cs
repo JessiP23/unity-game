@@ -23,6 +23,8 @@ namespace NightSupermarket.Game
             }
         }
         public GuardFlashlight Flashlight { get; set; }
+        /// <summary>Night-schedule multiplier on patrol and chase speed. 1 = the rules asset's values.</summary>
+        public float Pace { get; set; } = 1f;
         private NavMeshAgent agent;
         private GameRulesAsset rules;
         private Vector3[] patrol;
@@ -33,6 +35,9 @@ namespace NightSupermarket.Game
         private GuardVisionSystem vision;
         private bool playerDriven, searching;
         private float cruiseSpeed;
+        private Vector3 sentDestination;
+        private bool hasSent;
+        private const float EyeHeight = GuardVisionSystem.EyeHeight;
         public void Configure(GameRulesAsset config, WorldSignals world, Vector3[] points)
         {
             rules = config; patrol = points; Brain = new GuardBrain(config.patrolWait, config.searchDuration);
@@ -45,9 +50,9 @@ namespace NightSupermarket.Game
             vision = new GuardVisionSystem(config.visionDistance, config.fieldOfView, ~(1 << 2));
             hearing = world.Noise.Subscribe(noise =>
             {
-                if (Vector3.Distance(transform.position, noise.Position) <= config.hearingRadius * noise.Loudness
-                    && Brain.State != GuardState.Chase && Brain.State != GuardState.Capture)
-                    BeginInvestigation(noise.Position);
+                if (Brain == null || Brain.State == GuardState.Chase || Brain.State == GuardState.Capture) return;
+                if (Vector3.Distance(transform.position, noise.Position) > config.hearingRadius * noise.Loudness) return;
+                HearNoise(noise.Position);
             });
         }
         /// <summary>
@@ -65,6 +70,27 @@ namespace NightSupermarket.Game
             });
         }
         /// <summary>
+        /// A new sound starts an investigation. Footsteps from someone already being followed only
+        /// move the goal, so the path is not rebuilt on every step.
+        /// </summary>
+        private void HearNoise(Vector3 position)
+        {
+            if (Brain.State == GuardState.Investigate || Brain.State == GuardState.Search)
+            {
+                if (Vector3.Distance(LastKnownPosition, position) < 3f) return;
+                if (Brain.State == GuardState.Investigate)
+                {
+                    LastKnownPosition = position;
+                    hasSent = false;
+                    if (playerDriven || agent == null || !agent.isOnNavMesh) return;
+                    agent.isStopped = false;
+                    Go(position);
+                    return;
+                }
+            }
+            BeginInvestigation(position);
+        }
+        /// <summary>
         /// Starts walking to a heard or reported spot straight away. Otherwise a guard standing at the end of
         /// its old path would count as already arrived and search where it stood.
         /// </summary>
@@ -72,12 +98,22 @@ namespace NightSupermarket.Game
         {
             LastKnownPosition = position;
             Brain.Hear();
+            hasSent = false;
             if (playerDriven || agent == null || !agent.isOnNavMesh) return;
-            if (!NavMesh.SamplePosition(position, out var hit, 3, NavMesh.AllAreas)) return;
+            agent.isStopped = false;
+            Go(position);
+        }
+        /// <summary>Repeat SetDestination calls make the agent rebuild its path and stutter in place.</summary>
+        private void Go(Vector3 destination)
+        {
+            if (!NavMesh.SamplePosition(destination, out var hit, 3, NavMesh.AllAreas)) return;
+            if (hasSent && (hit.position - sentDestination).sqrMagnitude < 0.36f) return;
+            sentDestination = hit.position;
+            hasSent = true;
             agent.isStopped = false;
             agent.SetDestination(hit.position);
         }
-        public void TickGroup(IReadOnlyList<PlayerMotor> targets, IReadOnlyList<DetectionSystem> detections, float delta)
+        public void TickGroup(IReadOnlyList<PlayerMotor> targets, IReadOnlyList<DetectionSystem> detections, float delta, IReadOnlyList<bool> observations = null)
         {
             int chosen = -1, suspicious = -1;
             float best = float.PositiveInfinity, suspiciousDistance = float.PositiveInfinity;
@@ -85,18 +121,18 @@ namespace NightSupermarket.Game
             {
                 var target = targets[i];
                 if (target == null || detections[i] == null || !target.Record.Free) continue;
-                Vector3 eye = transform.position + Vector3.up * 0.6f;
-                var result = vision.CanSee(eye, transform.forward, target.transform.position + Vector3.up, target.transform);
-                var lamp = Flashlight != null ? Flashlight.Model : null;
-                bool visible = result.Visible || (lamp != null && vision.Observed(eye, transform.forward, target.transform.position + Vector3.up, target.transform, lamp));
+                Vector3 eye = transform.position + Vector3.up * EyeHeight;
+                float distance = Vector3.Distance(eye, target.transform.position + Vector3.up);
+                bool visible = observations != null ? observations[i] : vision.Observed(eye, transform.forward,
+                    target.transform.position + Vector3.up, target.transform, Flashlight != null ? Flashlight.Model : null);
                 if (!visible) continue;
-                if (detections[i].Suspicion.Value > 0 && result.Distance < suspiciousDistance)
-                { suspicious = i; suspiciousDistance = result.Distance; }
-                if (result.Distance < best) { chosen = i; best = result.Distance; }
+                if (detections[i].Suspicion.Value > 0 && distance < suspiciousDistance)
+                { suspicious = i; suspiciousDistance = distance; }
+                if (distance < best) { chosen = i; best = distance; }
             }
             int index = suspicious >= 0 ? suspicious : chosen;
-            if (index < 0) Tick(null, null, delta);
-            else Tick(targets[index], detections[index], delta);
+            if (index < 0) TickObserved(null, null, delta, false);
+            else TickObserved(targets[index], detections[index], delta, true);
         }
         /// <summary>Same body and perception as the AI. Input replaces patrol goals; it does not create a second rule set.</summary>
         public void Drive(Vector2 move, float speed, float delta)
@@ -112,13 +148,18 @@ namespace NightSupermarket.Game
         }
         public void Tick(PlayerMotor target, DetectionSystem detection, float delta)
         {
+            bool observed = target != null && target.Record.Free && vision.Observed(
+                transform.position + Vector3.up * EyeHeight, transform.forward,
+                target.transform.position + Vector3.up, target.transform, Flashlight != null ? Flashlight.Model : null);
+            TickObserved(target, detection, delta, observed);
+        }
+        private void TickObserved(PlayerMotor target, DetectionSystem detection, float delta, bool observed)
+        {
             if (PlayerDriven || Brain == null || !agent.isOnNavMesh) return;
             bool seen = false, threat = false, canCapture = false;
             if (target != null && detection != null && target.Record.Free)
             {
-                var lamp = Flashlight != null ? Flashlight.Model : null;
-                seen = vision.Observed(transform.position + Vector3.up * 0.6f, transform.forward,
-                    target.transform.position + Vector3.up, target.transform, lamp);
+                seen = observed;
                 threat = seen && detection.Suspicion.Value > 0;
                 if (threat || (seen && detection.State == DetectionState.Discovered)) LastKnownPosition = target.transform.position;
                 canCapture = seen && detection.State == DetectionState.Discovered
@@ -130,11 +171,11 @@ namespace NightSupermarket.Game
             bool search = Brain.State == GuardState.Search || Brain.State == GuardState.Capture;
             searching = search;
             agent.isStopped = search;
-            cruiseSpeed = Brain.State == GuardState.Chase ? rules.guardChaseSpeed : rules.guardSpeed;
+            cruiseSpeed = (Brain.State == GuardState.Chase ? rules.guardChaseSpeed : rules.guardSpeed) * Pace;
             if (!search)
             {
                 Vector3 destination = Brain.State == GuardState.Patrol || Brain.State == GuardState.ReturnToPatrol ? patrol[waypoint] : LastKnownPosition;
-                if (NavMesh.SamplePosition(destination, out var hit, 3, NavMesh.AllAreas)) agent.SetDestination(hit.position);
+                Go(destination);
             }
         }
         /// <summary>Turns the body toward its walking direction at a human rate instead of snapping.</summary>
@@ -147,12 +188,12 @@ namespace NightSupermarket.Game
             var facing = Quaternion.LookRotation(heading);
             transform.rotation = Quaternion.RotateTowards(transform.rotation, facing, rules.guardTurnSpeed * Time.deltaTime);
             float aligned = Mathf.Clamp01(Vector3.Dot(transform.forward, heading.normalized));
-            agent.speed = Mathf.Max(0.1f, (cruiseSpeed > 0 ? cruiseSpeed : rules.guardSpeed) * Mathf.Lerp(0.3f, 1f, aligned));
+            agent.speed = Mathf.Max(0.1f, (cruiseSpeed > 0 ? cruiseSpeed : rules.guardSpeed * Pace) * Mathf.Lerp(0.3f, 1f, aligned));
         }
         private void OnDrawGizmos()
         {
             if (!DebugVision || rules == null) return;
-            Gizmos.color = Color.yellow; Vector3 eye = transform.position + Vector3.up * 0.6f;
+            Gizmos.color = Color.yellow; Vector3 eye = transform.position + Vector3.up * EyeHeight;
             Gizmos.DrawRay(eye, Quaternion.Euler(0, -rules.fieldOfView / 2, 0) * transform.forward * rules.visionDistance);
             Gizmos.DrawRay(eye, Quaternion.Euler(0, rules.fieldOfView / 2, 0) * transform.forward * rules.visionDistance);
             Gizmos.DrawWireSphere(transform.position, rules.hearingRadius);

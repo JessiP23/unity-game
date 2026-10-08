@@ -77,6 +77,8 @@ namespace NightSupermarket.Game
         private void Idle(float delta)
         {
             if (brain.State == CustomerState.Alerted || brain.State == CustomerState.Reporting) return;
+            var passer = Perception != null ? Perception.NearbyMover(2.4f, 100f) : null;
+            if (passer != null) { Movement.Face(passer.transform.position); return; }
             var target = Navigation.Target;
             if (target == null) return;
             glanceTimer -= delta;

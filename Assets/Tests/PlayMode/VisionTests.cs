@@ -25,7 +25,11 @@ namespace NightSupermarket.Tests
                 Assert.That(vision.CanSee(eye, Vector3.forward, eye - Vector3.forward * 3).Visible, Is.False);
                 Assert.That(vision.LineTests, Is.Zero);
                 Assert.That(vision.CanSee(eye, Vector3.forward, eye + Vector3.forward * 4).LineOfSight, Is.False);
-                Assert.That(vision.LineTests, Is.EqualTo(1));
+                Assert.That(vision.LineTests, Is.EqualTo(2));
+                var shopper = new VisionSensor(7, 70, ~0) { CloseRange = 2.4f, CloseFieldOfView = 190f };
+                Assert.That(shopper.CanSee(eye, Vector3.forward, eye + Quaternion.Euler(0, 80, 0) * Vector3.forward * 2f).Visible, Is.True, "close pass is seen");
+                Assert.That(shopper.CanSee(eye, Vector3.forward, eye + Quaternion.Euler(0, 80, 0) * Vector3.forward * 4f).Visible, Is.False, "the same angle is missed farther away");
+                Assert.That(shopper.CanSee(eye, Vector3.forward, eye - Vector3.forward * 1.5f).Visible, Is.False, "behind stays unseen");
             }
             finally { Object.Destroy(wall); }
         }

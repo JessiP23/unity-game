@@ -1,5 +1,6 @@
 using NightSupermarket.Core;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 namespace NightSupermarket.Game
@@ -7,6 +8,10 @@ namespace NightSupermarket.Game
     [RequireComponent(typeof(Rigidbody))]
     public sealed class PhysicalItem : MonoBehaviour, IInteractable
     {
+        private static readonly List<PhysicalItem> active = new List<PhysicalItem>();
+        public static IReadOnlyList<PhysicalItem> Active => active;
+        private void OnEnable() { if (!active.Contains(this)) active.Add(this); }
+        private void OnDisable() => active.Remove(this);
         public string Id { get; } = Guid.NewGuid().ToString("N");
         public ItemDefinition Definition { get; private set; }
         /// <summary>While held the item travels with its carrier, so it stops carving the NavMesh.</summary>

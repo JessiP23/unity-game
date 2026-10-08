@@ -6,15 +6,19 @@ namespace NightSupermarket.Game
     public sealed class GameRulesAsset : ScriptableObject
     {
         public MissionDefinition[] missions = new MissionDefinition[0];
-        [Min(1)] public float matchDuration = 600;
+        [Min(1)] public float matchDuration = 360;
         [Min(0.01f)] public float orangeDuration = 1.5f;
         [Min(0.01f)] public float suspicionInterval = 1;
         [Min(1)] public int discoveryThreshold = 3;
         [Min(0.001f)] public float movementThreshold = 0.08f;
         public bool continuedMovementToDiscover = true;
+        [Tooltip("Seconds out of every watcher's sight that forgive one suspicion point. 0 keeps slips for the whole night.")]
+        [Min(0)] public float suspicionDecay = 30;
+        [Tooltip("How fast the guard's attention fades once he loses you: seconds of attention lost per unseen second.")]
+        [Min(0.1f)] public float attentionDrain = 2;
         [Min(0)] public int inventoryCapacity = 8;
         [Tooltip("Mannequin players in the match. Customers and staff are NPCs and never use these slots.")]
-        [Min(1)] public int mannequinPlayers = 4;
+        [Min(1)] public int mannequinPlayers = 1;
         [Header("Movement")]
         [Min(0.1f)] public float walkSpeed = 3;
         [Min(0.1f)] public float sprintSpeed = 5;
@@ -51,6 +55,6 @@ namespace NightSupermarket.Game
         [Range(1, 179)] public float flashlightCone = 40;
         public GameRules CreateRules() => new GameRules(matchDuration, orangeDuration, suspicionInterval,
             discoveryThreshold, movementThreshold, continuedMovementToDiscover, rescueCount, requiredEscapes,
-            allowWarehouseSelfRescue, requireMissionsToEscape, defeatWhenNoRescueRemains);
+            allowWarehouseSelfRescue, requireMissionsToEscape, defeatWhenNoRescueRemains, suspicionDecay, Mathf.Max(0.1f, attentionDrain));
     }
 }

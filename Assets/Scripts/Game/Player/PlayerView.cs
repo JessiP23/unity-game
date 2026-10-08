@@ -10,7 +10,7 @@ namespace NightSupermarket.Game
     /// </summary>
     public sealed class PlayerView : MonoBehaviour
     {
-        public const float BaseFieldOfView = 72f;
+        public const float BaseFieldOfView = 62f;
         public Camera View { get; private set; }
         public bool Active { get; set; } = true;
         [Tooltip("Vertical head bob in metres at walking pace. Zero disables it.")]

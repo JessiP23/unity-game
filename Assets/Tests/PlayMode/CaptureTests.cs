@@ -51,7 +51,7 @@ namespace NightSupermarket.Tests
         }
         [UnityTest] public IEnumerator PrototypeSceneStartsNightWithGuardRescueAndEscape()
         {
-            yield return SceneManager.LoadSceneAsync("Prototype");
+            yield return CoopTestScene.Load();
             yield return null;
             yield return new WaitForFixedUpdate();
             var root = Object.FindAnyObjectByType<PrototypeRoot>();

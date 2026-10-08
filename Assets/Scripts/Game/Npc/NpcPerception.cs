@@ -34,7 +34,7 @@ namespace NightSupermarket.Game
 
         public void Configure(float range, float fieldOfView, float sampleInterval, AwarenessSettings settings, float phase)
         {
-            sensor = new VisionSensor(range, fieldOfView, ~(1 << 2));
+            sensor = new VisionSensor(range, fieldOfView, ~(1 << 2)) { CloseRange = 2.4f, CloseFieldOfView = 190f };
             awareness = settings; interval = Mathf.Max(0.02f, sampleInterval);
             clock = phase * interval;
             trackers.Clear(); Focus = null;
@@ -71,7 +71,7 @@ namespace NightSupermarket.Game
                 if (target.Noticeable && (target.transform.position - transform.position).sqrMagnitude <= reach * reach)
                     visible = sensor.CanSee(eye, forward, target.AimPoint, target.transform).Visible;
                 Vector3 p = target.transform.position;
-                if (tracker.Tick(visible, target.RecentSpeed, new MapPoint(p.x, p.y, p.z), elapsed)) ReportReady?.Invoke(target, tracker);
+                if (tracker.Tick(visible, target.Speed, new MapPoint(p.x, p.y, p.z), elapsed)) ReportReady?.Invoke(target, tracker);
                 double weight = (int)tracker.State * 10 + tracker.Suspicion;
                 if (tracker.State != AwarenessState.Unaware && weight > strongest) { strongest = weight; Focus = target; }
             }
@@ -88,6 +88,28 @@ namespace NightSupermarket.Game
         }
 
         public AwarenessState StateFor(PerceptionTarget target) => target != null && trackers.TryGetValue(target, out var t) ? t.State : AwarenessState.Unaware;
+
+        /// <summary>A moving mannequin near the eyes. No raycast; the vision sample still confirms line of sight.</summary>
+        public PerceptionTarget NearbyMover(float range, float degrees)
+        {
+            PerceptionTarget best = null;
+            float bestDistance = range;
+            Vector3 forward = transform.forward;
+            foreach (var target in PerceptionTarget.Active)
+            {
+                if (target == null || !target.Noticeable || target.Speed < awareness.MovementThreshold) continue;
+                Vector3 flat = target.transform.position - transform.position;
+                flat.y = 0;
+                float distance = flat.magnitude;
+                if (distance < 0.2f || distance > bestDistance) continue;
+                if (Vector3.Angle(forward, flat) > degrees) continue;
+                // Looking toward a passer must not reveal someone through a shelf.
+                if (!trackers.TryGetValue(target, out var tracker) || !tracker.Visible) continue;
+                best = target;
+                bestDistance = distance;
+            }
+            return best;
+        }
 
         /// <summary>Forget everything (after reporting, or when returned to the pool).</summary>
         public void ResetAll() { foreach (var tracker in trackers.Values) tracker.Reset(); Focus = null; }

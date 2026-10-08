@@ -1,5 +1,34 @@
 # Testing
 
+## Current verification — 2026-10-02
+
+Unity EditMode: 76 passed. PlayMode: 49 passed, zero failed; the screenshot-only
+case was skipped in that run and passed separately with `Tools/unity.py shots`.
+New checks cover camouflage's fixed per-sighting grace, no regrant while seen,
+shirt/stillness requirements, leaving/turning out of a pose, delayed bell hearing,
+shared cooldown and pause, optional-work cancellation and one-time rewards,
+optional objectives not gating escape, NavMesh reachability, and rescue behavior.
+
+After grounding the new stands, the four focused integration tests passed again.
+Screenshot review covers the model stand, bell, bonus stand, HUD and Missions page;
+the new label shader depth-tests against store geometry. The full suites include
+prior detection and NPC regressions. This is local/host prototype validation, not
+cross-device replication or measured player FPS.
+
+## Detection/guidance verification — 2026-10-01
+
+After the detection consistency and guidance changes, Unity EditMode passed 73
+tests and PlayMode passed 45 tests, with zero failures. The screenshot-only test
+was skipped by the normal PlayMode run and then passed separately with
+`python3 Tools/unity.py shots`. The generated HUD screenshot was visually checked.
+
+Coverage includes close-range horizontal vision, partial/full cover, real-time
+guard grace, immediate loss of sight, live versus remembered NPC status, compass
+directions, counted mission item exclusion, escape guidance, and capture hiding
+pickup guidance. The headless NPC/perception performance budget also passed.
+These results do not establish rendered player FPS or cross-device multiplayer
+acceptance. Records below describe earlier milestones and their limits at the time.
+
 Run `python3 Tools/check_scaffold.py` and `python3 Tools/test_unity_runner.py`
 for repository/tooling checks. They do not replace Unity tests.
 

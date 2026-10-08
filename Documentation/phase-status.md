@@ -19,6 +19,7 @@
 | 14 | Staged vision cost | Passed: out-of-range and out-of-FOV checks do not raycast |
 | 15 | Player guard and push | Passed locally. Same guard body can be driven by a player |
 | Backend | PlayFab accounts/lobby | Not installed. `IPlayerDataService` is in-memory only |
+| Redesign | Readable HUD, capture flow, fair detection, scoring, night schedule, poses, seeded shifts, six back-hall trials | Compiled and Core-tested 2026-10-07; needs an Editor play run. See redesign.md |
 | Art | Models, environment, animations, audio, UI | After programming acceptance |
 | Polish | Final refinement | After asset integration |
 

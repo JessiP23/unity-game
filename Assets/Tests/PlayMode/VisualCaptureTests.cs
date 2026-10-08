@@ -16,6 +16,9 @@ namespace NightSupermarket.Tests.PlayMode
     {
         private static readonly (string name, Vector3 position, Vector3 target)[] Views =
         {
+            ("display_pose", new Vector3(-4.2f, 1.6f, 10.8f), new Vector3(-4.2f, 1.3f, 12.9f)),
+            ("distraction_bell", new Vector3(-8.8f, 1.6f, -1.8f), new Vector3(-8.8f, 1.2f, 1.8f)),
+            ("bonus_display", new Vector3(3, 1.6f, -8.5f), new Vector3(3, 1.2f, -5.7f)),
             ("entrance", new Vector3(0, 1.6f, -13.5f), new Vector3(0, 1.2f, 0)),
             ("aisle", new Vector3(-2.5f, 1.6f, -6), new Vector3(-2.5f, 1.2f, 6)),
             ("checkout", new Vector3(8, 1.6f, -6), new Vector3(3, 1f, -12)),

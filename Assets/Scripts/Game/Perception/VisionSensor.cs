@@ -11,14 +11,17 @@ namespace NightSupermarket.Game
     }
 
     /// <summary>
-    /// Shared eyes for every observer type: cheap distance and field-of-view rejection first, then one
-    /// line-of-sight ray. Guards, customers, and employees differ only in the range and angle they pass in;
+    /// Shared eyes for every observer type: cheap distance and field-of-view rejection first, then at most two
+    /// line-of-sight rays (chest, then head). Guards, customers, and employees differ only in the range and angle they pass in;
     /// what an observer makes of a sighting is decided elsewhere.
     /// </summary>
     public class VisionSensor
     {
         private readonly float range, halfFov;
         private readonly int mask;
+        /// <summary>Someone this close is noticed well outside the focused cone. Zero disables it.</summary>
+        public float CloseRange;
+        public float CloseFieldOfView = 190f;
         public float Range => range;
         public float FieldOfView => halfFov * 2;
         public int LineTests { get; private set; }
@@ -28,10 +31,21 @@ namespace NightSupermarket.Game
         {
             Vector3 direction = target - eye; float distance = direction.magnitude;
             if (distance > range) return new VisionResult(false, false, distance, 180);
-            float angle = Vector3.Angle(forward, direction);
-            if (angle > halfFov) return new VisionResult(false, false, distance, angle);
+            float angle = HorizontalAngle(forward, direction);
+            float limit = halfFov;
+            if (CloseRange > 0 && distance <= CloseRange) limit = Mathf.Max(halfFov, CloseFieldOfView * 0.5f);
+            if (angle > limit) return new VisionResult(false, false, distance, angle);
             bool clear = ClearLine(eye, target, targetRoot);
+            if (!clear)
+                clear = ClearLine(eye, target + Vector3.up * 0.45f, targetRoot);
             return new VisionResult(clear, clear, distance, angle);
+        }
+        // Field of view describes a horizontal cone. A chest below eye level must not
+        // disappear merely because the observer is close to a standing mannequin.
+        private static float HorizontalAngle(Vector3 forward, Vector3 direction)
+        {
+            forward.y = 0; direction.y = 0;
+            return direction.sqrMagnitude < 0.000001f ? 0 : Vector3.Angle(forward, direction);
         }
         public void ResetLineTests() => LineTests = 0;
         public bool ClearLine(Vector3 eye, Vector3 target, Transform targetRoot)

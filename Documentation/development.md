@@ -11,6 +11,21 @@ Unity Hub is `.toolchain/Unity Hub.app`. Sign in there and activate an appropria
 license. The Editor executable is `.toolchain/Unity/Unity.app/Contents/MacOS/Unity`.
 Alternatively set `UNITY_EDITOR` to a compatible installed Editor executable.
 
+## Play and ship
+Close any other Editor on this project, then from the repo root:
+
+```sh
+python3 Tools/unity.py open
+```
+
+That opens the prototype. In game: **Tab** is the menu, **V** is the map, **E** picks up, **G** drops.
+
+```sh
+python3 Tools/unity.py build
+```
+
+That writes `Builds/Windows/NightSupermarket.exe`. It is a Development Windows build. Run it on Windows.
+
 ## Configure, test, open
 Run from the repository root, with other Editors for this project closed:
 ```sh

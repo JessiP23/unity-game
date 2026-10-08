@@ -5,7 +5,7 @@ namespace NightSupermarket.Game
     public sealed class RescueInteractable : MonoBehaviour, IInteractable
     {
         private LocalMatchAuthority authority;
-        public string Prompt => "E — rescue warehoused mannequin";
+        public string Prompt => authority != null && authority.Warehouse.Count > 0 ? "E — rescue teammate · use the bell to draw the guard away" : "No teammates in warehouse";
         public void Configure(LocalMatchAuthority match) { authority = match; }
         public bool TryInteract(PlayerMotor player)
         {

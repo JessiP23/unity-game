@@ -28,6 +28,8 @@ namespace NightSupermarket.Game
         public int Customers { get { int n = 0; foreach (var npc in active) if (npc.Role == NpcRole.Customer) n++; return n; } }
         public int Pooled => pool.Count;
         public NpcPopulationSettings Settings => settings;
+        /// <summary>Night-schedule share of the normal crowd. 1 = the settings asset; 0 = nobody new comes in.</summary>
+        public float CrowdScale { get; set; } = 1f;
 
         public void Configure(StoreDirectory store, NpcPopulationSettings population, Func<SuspiciousActivityEvent, bool> sink, Func<double> time, bool authority, int seed)
         {
@@ -63,7 +65,7 @@ namespace NightSupermarket.Game
             get
             {
                 float wave = 0.5f + 0.5f * Mathf.Sin(elapsed / settings.crowdCycleSeconds * Mathf.PI * 2f);
-                return Mathf.Min(settings.maxActiveCustomers, Mathf.RoundToInt(Mathf.Lerp(settings.minimumCustomers, settings.maximumCustomers, wave)));
+                return Mathf.Min(settings.maxActiveCustomers, Mathf.RoundToInt(Mathf.Lerp(settings.minimumCustomers, settings.maximumCustomers, wave) * Mathf.Clamp01(CrowdScale)));
             }
         }
 
@@ -179,6 +181,16 @@ namespace NightSupermarket.Game
                 if (state > strongest) strongest = state;
             }
             return strongest;
+        }
+
+        /// <summary>Current sight, separate from suspicion retained in an NPC's memory.</summary>
+        public int WatchingCount(PerceptionTarget target)
+        {
+            if (target == null || !target.Noticeable) return 0;
+            int count = 0;
+            foreach (var npc in active)
+                if (npc.Perception != null && npc.Perception.Trackers.TryGetValue(target, out var tracker) && tracker.Visible) count++;
+            return count;
         }
 
         public void CaptureSnapshots(List<NpcSnapshot> into)

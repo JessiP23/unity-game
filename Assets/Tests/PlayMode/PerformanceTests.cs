@@ -73,7 +73,7 @@ namespace NightSupermarket.Tests
             File.WriteAllText("TestResults/performance.txt", report);
             Debug.Log("[PERF]\n" + report);
             Assert.That(bodies, Is.LessThanOrEqualTo(population.Settings.maxActiveCustomers + population.Settings.employees + 2), "no body leak at the cap");
-            Assert.That(raysPerSecond, Is.LessThan(population.Active.Count * root.MannequinCount * 6), "at most one ray per NPC-mannequin pair per sample");
+            Assert.That(raysPerSecond, Is.LessThan(population.Active.Count * root.MannequinCount * 11), "at most two rays per NPC-mannequin pair per 0.2s sample");
             Assert.That(snapshotBytes, Is.LessThanOrEqualTo(48), "snapshot stays small");
             Cursor.lockState = CursorLockMode.None;
         }

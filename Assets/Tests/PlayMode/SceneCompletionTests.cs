@@ -18,7 +18,7 @@ namespace NightSupermarket.Tests
 
         private static IEnumerator Load()
         {
-            yield return SceneManager.LoadSceneAsync("Prototype");
+            yield return CoopTestScene.Load();
             yield return null;
             yield return new WaitForFixedUpdate();
         }
@@ -151,7 +151,8 @@ namespace NightSupermarket.Tests
             var root = Root;
             for (int i = 0; i < root.MannequinCount; i++) root.Authority.TryCapture(root.MannequinAt(i).Record.Id);
             Assert.That(root.Population.Customers, Is.GreaterThan(0));
-            Assert.That(root.Authority.Phase, Is.EqualTo(MatchPhase.Defeat));
+            Assert.That(root.Authority.Phase, Is.EqualTo(MatchPhase.Night));
+            Assert.That(root.MannequinAt(0).Record.InBackroom, Is.True);
         }
 
         /// <summary>

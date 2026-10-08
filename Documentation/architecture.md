@@ -8,7 +8,7 @@ Player commands must match `IPlayerSession`. `AcceptClientClaim` ignores declara
 
 Networking and account interfaces (`INetworkService`, `ILobbyService`, `IMatchService`, `IPlayerDataService`) have local implementations. Profile storage keeps look sensitivity only. Match progress is not written there.
 
-Presentation is replaceable. `PoseMap` exposes the pose an animator would play. `FlashlightModel` is the gameplay cone; a spot light only draws it. `AudioCue` is a hook with no clips. `PrototypeHud` lays out uGUI text with Unity's built-in font, and IMGUI otherwise.
+Presentation is replaceable. `PoseMap` exposes the pose an animator would play. `FlashlightModel` is the gameplay cone; a spot light only draws it. `AudioCue` is a hook with no clips. `StoreAudio` plays two generated clips: speed-scaled footsteps, which are also quiet guard noise, and a chime when one job completes. `PrototypeHud` lays out uGUI text with Unity's built-in font, and IMGUI otherwise.
 
 `NightSupermarket.Game` is split by feature:
 

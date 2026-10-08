@@ -69,7 +69,8 @@ namespace NightSupermarket.Tests
             var a = Join(blocked, blockedSession);
             var b = Join(blocked, blockedSession);
             blocked.TryCapture(a.Id); blocked.TryCapture(b.Id);
-            Assert.That(blocked.Flow.Phase, Is.EqualTo(MatchPhase.Defeat));
+            Assert.That(blocked.Flow.Phase, Is.EqualTo(MatchPhase.Night));
+            Assert.That(blocked.TryRescueGroup(a.Id, a.Id), Is.Zero);
             var open = Night(new GameRules(allowSelfRescue: true), out var openSession);
             var solo = Join(open, openSession);
             Assert.That(open.TryCapture(solo.Id), Is.True);
@@ -132,7 +133,7 @@ namespace NightSupermarket.Tests
             win.Tick(10);
             Assert.That(win.Flow.Phase, Is.EqualTo(MatchPhase.Victory));
         }
-        [Test] public void AllCapturedDefeatsUnlessRescueRemains()
+        [Test] public void AllCapturedStaysPlayableThroughTheBackroom()
         {
             var authority = Night(new GameRules(requiredEscapes: 2), out var session);
             var first = Join(authority, session);
@@ -141,7 +142,7 @@ namespace NightSupermarket.Tests
             authority.TryCapture(first.Id);
             Assert.That(authority.Flow.Phase, Is.EqualTo(MatchPhase.Night));
             authority.TryCapture(second.Id);
-            Assert.That(authority.Flow.Phase, Is.EqualTo(MatchPhase.Defeat));
+            Assert.That(authority.Flow.Phase, Is.EqualTo(MatchPhase.Night));
             Assert.That(guard.Free, Is.True);
         }
         [Test] public void ClientClaimsAndImpersonationDoNotChangeState()

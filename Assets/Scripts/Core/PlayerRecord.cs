@@ -8,6 +8,8 @@ namespace NightSupermarket.Core
         public string Id { get; }
         public PlayerRole Role { get; }
         public PlayerState State { get; private set; }
+        /// <summary>Caught players walk this pocket themselves. Teammates can still rescue them.</summary>
+        public bool InBackroom { get; private set; }
         public bool Free => State != PlayerState.Captured && State != PlayerState.Surveillance && State != PlayerState.Escaping && State != PlayerState.Escaped && State != PlayerState.Inactive;
         public event Action<PlayerState> Changed;
         public PlayerRecord(string id, PlayerRole role = PlayerRole.Mannequin)
@@ -15,6 +17,13 @@ namespace NightSupermarket.Core
             if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException(nameof(id));
             Id = id; Role = role;
         }
-        public void SetState(PlayerState state) { if (State == state) return; State = state; Changed?.Invoke(state); }
+        public void SetBackroom(bool inside) { InBackroom = inside; }
+        public void SetState(PlayerState state)
+        {
+            if (State == state) return;
+            State = state;
+            if (state != PlayerState.Captured && state != PlayerState.Surveillance) InBackroom = false;
+            Changed?.Invoke(state);
+        }
     }
 }

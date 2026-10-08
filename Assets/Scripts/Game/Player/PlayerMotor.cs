@@ -32,7 +32,9 @@ namespace NightSupermarket.Game
         /// <summary>Simulates one authoritative step; detection reads actual displacement.</summary>
         public void Simulate(PlayerCommand input, float delta)
         {
-            if (Record == null || !Record.Free) { ActualSpeed = 0; planar = Vector3.zero; return; }
+            bool pocket = Record != null && Record.InBackroom;
+            if (Record == null || (!Record.Free && !pocket)) { ActualSpeed = 0; planar = Vector3.zero; return; }
+            if (pocket) input = new PlayerCommand(input.Move, false, false);
             GameRules.RequireDelta(delta); if (delta == 0) return;
             Vector2 move = Vector2.ClampMagnitude(input.Move, 1);
             bool grounded = controller.isGrounded;
@@ -49,7 +51,7 @@ namespace NightSupermarket.Game
             ActualSpeed = moved.magnitude;
             var actualPlanar = new Vector3(moved.x, 0, moved.z);
             if (actualPlanar.sqrMagnitude < planar.sqrMagnitude) planar = actualPlanar;
-            if (Record.State != PlayerState.Carrying)
+            if (!pocket && Record.State != PlayerState.Carrying)
                 Record.SetState(!controller.isGrounded ? PlayerState.Jumping : input.Sprint && move.sqrMagnitude > 0 ? PlayerState.Running : PlayerState.Normal);
         }
         private void OnControllerColliderHit(ControllerColliderHit hit)
