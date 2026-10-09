@@ -61,7 +61,13 @@ namespace NightSupermarket.Game
                         Skin(renderer, "wood_table_001", 1.2f, new Color(0.8f, 0.7f, 0.6f), 0.3f, false);
                         if (art) Produce(fixed_, t.position, t.localScale, rng); break;
                     case "Employee counter": Skin(renderer, "wood_table_001", 1.2f, Color.white, 0.35f, false); break;
-                    case "Escape door": Skin(renderer, "blue_metal_plate", 1.2f, new Color(0.55f, 0.62f, 0.56f), 0.45f, false); break;
+                    case "Escape door": case "Fire exit": Skin(renderer, "blue_metal_plate", 1.2f, new Color(0.55f, 0.62f, 0.56f), 0.45f, false); break;
+                    case "Mezzanine floor": case "Mezzanine landing": Skin(renderer, "smooth_concrete_floor", 2.5f, new Color(0.8f, 0.79f, 0.76f), 0.3f, false); break;
+                    case "Escalator": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.42f, 0.43f, 0.46f), 0.75f, 0.9f); break;
+                    case "Escalator side": case "Mezzanine rail": case "Rail post": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.2f, 0.21f, 0.24f), 0.7f, 0.85f); break;
+                    case "Gallery lounge":
+                        renderer.sharedMaterial = ArtLibrary.Surface("wool_boucle", new Vector2(3, 3), new Color(0.6f, 0.5f, 0.36f), 0.02f) ?? ArtLibrary.Lit(new Color(0.5f, 0.42f, 0.3f), 0.05f);
+                        if (art) DepartmentDressing.Lounge(fixed_, t.position); break;
                     case "Clothing table": case "Home table": Skin(renderer, "wood_table_001", 1.2f, new Color(0.85f, 0.75f, 0.65f), 0.4f, false); break;
                     case "Mannequin platform": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.92f, 0.92f, 0.9f), 0.8f); break;
                     case "Electronics wall": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.22f, 0.28f, 0.36f), 0.45f); break;
@@ -109,7 +115,7 @@ namespace NightSupermarket.Game
 
         private static void Shell(Transform parent, StoreLighting lighting, bool art)
         {
-            var ceiling = Panel(parent, "Ceiling", new Vector3(0, 3.05f, 0), new Vector3(30, 0.1f, 30));
+            var ceiling = Panel(parent, "Ceiling", new Vector3(0, PrimitiveWorld.CeilingY, 0), new Vector3(30, 0.1f, 30));
             var ceilingMaterial = ArtLibrary.Surface("ceiling_interior", new Vector2(12, 12), new Color(0.95f, 0.95f, 0.93f), 0.05f);
             ceiling.sharedMaterial = ceilingMaterial != null ? ceilingMaterial : ArtLibrary.Lit(new Color(0.6f, 0.6f, 0.6f), 0.05f);
             var concrete = ArtLibrary.Surface("smooth_concrete_floor", new Vector2(2.5f, 2.5f), new Color(0.75f, 0.75f, 0.72f), 0.35f);
@@ -130,14 +136,24 @@ namespace NightSupermarket.Game
             var emergencyLamps = new List<Vector3>
             {
                 new Vector3(-2, 2.85f, -14.7f), new Vector3(-14.7f, 2.85f, -4), new Vector3(14.7f, 2.85f, -4),
-                new Vector3(0, 2.85f, 14.7f), new Vector3(-12.5f, 2.85f, 8.25f), new Vector3(11.5f, 2.85f, 5.2f)
+                new Vector3(0, 2.85f, 14.7f), new Vector3(-12.5f, 2.85f, 8.25f), new Vector3(11.5f, 2.85f, 5.2f),
+                new Vector3(12.5f, PrimitiveWorld.UpstairsY + 2.85f, 14.7f)
             };
+            // Fire exit upstairs: a green sign that never goes out, so lockdown still shows the way.
+            Panel(parent, "Fire exit sign", PrimitiveWorld.FireExit + new Vector3(0, 1.5f, -0.25f), new Vector3(0.9f, 0.3f, 0.05f)).sharedMaterial = ArtLibrary.Emissive(new Color(0.2f, 1f, 0.45f), 1.6f);
+            lighting.AddGlow(PrimitiveWorld.FireExit + new Vector3(0, 1.4f, -0.6f), new Color(0.3f, 1f, 0.5f), 4f, 1.2f);
             foreach (var point in emergencyLamps)
             {
                 Panel(parent, "Emergency lamp", point, new Vector3(0.3f, 0.1f, 0.3f)).sharedMaterial = ArtLibrary.Emissive(new Color(1f, 0.15f, 0.1f), 1.2f);
                 lighting.AddEmergency(point + Vector3.down * 0.2f, 12f);
             }
             lighting.AddDawn(new Vector3(0, 2.7f, -14.5f), new Vector3(0, 0, -4));
+            // Skylights in the raised ceiling over the open sales floor: moonlight after lights out.
+            foreach (var at in new[] { new Vector3(-8f, 0, -7f), new Vector3(-8f, 0, 6f), new Vector3(6f, 0, -6f), new Vector3(7.5f, 0, 10f) })
+            {
+                Panel(parent, "Skylight pane", new Vector3(at.x, PrimitiveWorld.CeilingY - 0.06f, at.z), new Vector3(2.4f, 0.02f, 2.4f)).sharedMaterial = ArtLibrary.Emissive(new Color(0.5f, 0.62f, 0.9f), 0.35f);
+                lighting.AddSkylight(new Vector3(at.x, PrimitiveWorld.CeilingY - 0.1f, at.z));
+            }
         }
 
         private static void Fixtures(Transform parent, StoreLighting lighting, bool art)
@@ -150,11 +166,21 @@ namespace NightSupermarket.Game
                     var visual = art ? ArtLibrary.Spawn("mounted_fluorescent_lights", parent, new Vector3(x, 3.0f, z), 90) : null;
                     lighting.AddFixture(visual, new Vector3(x, 2.92f, z), 7.5f, 13f, index == 5, false);
                     index++;
+                    // The sales floor is open to the raised ceiling; fixtures hang on pendants except under the mezzanine.
+                    bool underMezzanine = x > 1f && z > 5f;
+                    if (!underMezzanine)
+                        Panel(parent, "Pendant", new Vector3(x, (3.0f + PrimitiveWorld.CeilingY) * 0.5f, z), new Vector3(0.05f, PrimitiveWorld.CeilingY - 3.0f, 0.05f)).sharedMaterial = ArtLibrary.Lit(new Color(0.15f, 0.15f, 0.16f), 0.4f);
                 }
+            foreach (float x in new[] { 4f, 11f })
+            {
+                var visual = art ? ArtLibrary.Spawn("mounted_fluorescent_lights", parent, new Vector3(x, PrimitiveWorld.CeilingY - 0.05f, 10f), 90) : null;
+                lighting.AddFixture(visual, new Vector3(x, PrimitiveWorld.CeilingY - 0.13f, 10f), 7.5f, 13f, false, false);
+            }
             foreach (var position in new[] { new Vector3(-12.6f, 3f, 10.2f), new Vector3(-10f, 3f, 12f) })
             {
                 var cage = art ? ArtLibrary.Spawn("caged_hanging_light", parent, position, 0) : null;
                 lighting.AddFixture(cage, position + Vector3.down * 0.9f, 5.5f, 9f, position.x > -11, true, new Color(1f, 0.88f, 0.7f));
+                Panel(parent, "Pendant", new Vector3(position.x, (3.0f + PrimitiveWorld.CeilingY) * 0.5f, position.z), new Vector3(0.05f, PrimitiveWorld.CeilingY - 3.0f, 0.05f)).sharedMaterial = ArtLibrary.Lit(new Color(0.15f, 0.15f, 0.16f), 0.4f);
             }
             foreach (var position in new[] { new Vector3(11.5f, 3f, 8f), new Vector3(11.5f, 3f, 12.5f) })
             {

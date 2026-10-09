@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NightSupermarket.Core;
+using UnityEngine;
 namespace NightSupermarket.Game
 {
     public enum MenuPage { Night, Missions, Inventory, Reports, Cameras, Controls }
@@ -18,8 +19,11 @@ namespace NightSupermarket.Game
     {
         public readonly float X, Z;
         public readonly string Tint, Label;
-        public MapMark(float x, float z, string tint, string label = "")
-        { X = x; Z = z; Tint = tint; Label = label; }
+        /// <summary>Above the mezzanine floor: drawn in the Upstairs inset instead of the main map.</summary>
+        public readonly bool Upstairs;
+        public MapMark(float x, float z, string tint, string label = "", bool upstairs = false)
+        { X = x; Z = z; Tint = tint; Label = label; Upstairs = upstairs; }
+        public MapMark(Vector3 at, string tint, string label = "") : this(at.x, at.z, tint, label, at.y > 2.5f) { }
     }
 
     /// <summary>One frame of HUD copy. Presentation only; rules stay on the authority.</summary>
@@ -39,11 +43,15 @@ namespace NightSupermarket.Game
 
         // Night phase
         public string PhaseLabel, PhaseCountdown;
+        public string GuardName, GuardTell;
 
         // Score
         public int Score, Shift, Best;
         public float Multiplier, StreakFraction;
         public string StreakLabel;
+
+        // Wardrobe and gems (Night page)
+        public string WardrobeText, GemText;
 
         // Pose
         public bool Posing, PoseMatches;
@@ -58,6 +66,10 @@ namespace NightSupermarket.Game
         public bool Ended, Victory;
         public string Grade, EndTitle, EndDetail;
         public readonly List<HudLine> ScoreLines = new List<HudLine>();
+        /// <summary>Top scores for this shift (Done marks the local player's row), plus the name line under it.</summary>
+        public readonly List<HudLine> BoardLines = new List<HudLine>();
+        public string BoardTitle, BoardNote, PlayerName;
+        public bool EditingName;
 
         public readonly List<HudLine> Missions = new List<HudLine>();
         public readonly List<HudLine> Items = new List<HudLine>();
@@ -68,7 +80,7 @@ namespace NightSupermarket.Game
 
         public void ClearLists()
         {
-            Missions.Clear(); Items.Clear(); ReportLines.Clear(); Controls.Clear(); Testing.Clear(); Marks.Clear(); ScoreLines.Clear();
+            Missions.Clear(); Items.Clear(); ReportLines.Clear(); Controls.Clear(); Testing.Clear(); Marks.Clear(); ScoreLines.Clear(); BoardLines.Clear();
         }
     }
 }

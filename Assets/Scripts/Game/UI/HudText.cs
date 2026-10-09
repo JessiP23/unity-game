@@ -21,6 +21,7 @@ namespace NightSupermarket.Game
             ZoneType.Warehouse => "the warehouse",
             ZoneType.Employee => "the staff room",
             ZoneType.Security => "Security",
+            ZoneType.Mezzanine => "Upstairs",
             _ => "the store"
         };
 

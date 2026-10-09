@@ -61,6 +61,16 @@ namespace NightSupermarket.Game
         public void Face(Vector3 point) => faceTarget = point;
         public void ClearFacing() => faceTarget = null;
 
+        private float pausedUntil;
+        /// <summary>Stops in place for a moment (a double take, a selfie) and then carries on along the same path.</summary>
+        public void Pause(float seconds, Vector3? lookAt = null)
+        {
+            pausedUntil = Mathf.Max(pausedUntil, Time.time + seconds);
+            if (lookAt.HasValue) faceTarget = lookAt;
+            if (agent != null && agent.enabled && agent.isOnNavMesh) agent.isStopped = true;
+        }
+        public bool Paused => Time.time < pausedUntil;
+
         /// <summary>Reached the destination, or the path ended as close as the NavMesh allows.</summary>
         public bool Arrived
         {
@@ -99,6 +109,12 @@ namespace NightSupermarket.Game
         private void Update()
         {
             if (agent == null || !agent.enabled) return;
+            if (pausedUntil > 0f && Time.time >= pausedUntil)
+            {
+                pausedUntil = 0f; faceTarget = null;
+                if (agent.isOnNavMesh && HasDestination) agent.isStopped = false;
+            }
+            if (Paused) stuckTimer = 0;
             Vector3 heading = agent.desiredVelocity; heading.y = 0;
             if (faceTarget.HasValue && heading.sqrMagnitude < 0.04f)
             {

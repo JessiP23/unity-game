@@ -20,6 +20,8 @@
 | 15 | Player guard and push | Passed locally. Same guard body can be driven by a player |
 | Backend | PlayFab accounts/lobby | Not installed. `IPlayerDataService` is in-memory only |
 | Redesign | Readable HUD, capture flow, fair detection, scoring, night schedule, poses, seeded shifts, six back-hall trials | Compiled and Core-tested 2026-10-07; needs an Editor play run. See redesign.md |
+| Redesign 2–4 | Job pool and props, cameras, procedural poses, shopper reactions, guard roster, career gadgets, per-shift leaderboard with optional shared server | Compiled, 72 Core tests pass 2026-10-08; PlayMode and feel need an Editor run. Online co-op planned only: coop-plan.md |
+| Redesign 5 | Hidden gems, outfits as camouflage, second floor with escalator and fire exit, lockdown shutter, closing-time light sweep, skylights | Compiled, 77 Core tests pass 2026-10-08; MezzanineTests need an Editor run. See redesign.md |
 | Art | Models, environment, animations, audio, UI | After programming acceptance |
 | Polish | Final refinement | After asset integration |
 

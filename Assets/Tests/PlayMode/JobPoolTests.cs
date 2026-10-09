@@ -47,6 +47,35 @@ namespace NightSupermarket.Tests
             PrototypeRoot.NextShift = 0;
         }
 
+        /// <summary>The furniture snap must leave items that sit ON a table alone; shift 0 always draws the shirt job.</summary>
+        [UnityTest] public IEnumerator ShirtsStayOnTheClothingTables()
+        {
+            PrototypeRoot.NextShift = 0;
+            yield return SceneManager.LoadSceneAsync("Prototype"); yield return null;
+            yield return new WaitForSeconds(0.5f); // let physics settle
+            int shirts = 0;
+            foreach (var item in Object.FindObjectsByType<PhysicalItem>(FindObjectsSortMode.None))
+            {
+                if (item.Definition == null || item.Definition.missionTag != "shirt") continue;
+                shirts++;
+                var at = item.transform.position;
+                Assert.That(at.y, Is.GreaterThan(0.85f), "shirt fell off its table to " + at);
+                Assert.That(Mathf.Abs(at.z - 9.0f), Is.LessThan(0.5f), "shirt left the table row: " + at);
+            }
+            Assert.That(shirts, Is.EqualTo(2));
+            var root = Object.FindAnyObjectByType<PrototypeRoot>();
+            var player = root.Player;
+            // Stand in front of the first table, look at the shirt: the probe must offer it.
+            player.transform.position = new Vector3(-6.2f, 0.1f, 7.9f);
+            player.transform.rotation = Quaternion.identity;
+            Physics.SyncTransforms();
+            var probe = player.GetComponent<InteractionProbe>();
+            var view = player.GetComponent<PlayerView>();
+            var target = probe.FindTarget(view.View.transform.position, (new Vector3(-6.2f, 0.94f, 9.0f) - view.View.transform.position).normalized);
+            Assert.That(target, Is.Not.Null, "looking at the shirt from the aisle offers nothing");
+            Assert.That(target is PhysicalItem p && p.Definition.missionTag == "shirt", Is.True, "offered " + target);
+        }
+
         [UnityTest] public IEnumerator HoldSpotCountsOnlyAfterStandingStill()
         {
             PrototypeRoot.NextShift = 0;

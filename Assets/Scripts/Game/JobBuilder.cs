@@ -14,6 +14,9 @@ namespace NightSupermarket.Game
         public IReadOnlyList<JobTemplate> Jobs { get; private set; }
         public MissionDefinition[] Definitions { get; private set; }
         public Transform Escape { get; private set; }
+        /// <summary>The upstairs fire exit: the only way out once the front shutter is down.</summary>
+        public Transform FireExit { get; private set; }
+        public FrontShutter Shutter { get; private set; }
         public Transform Rescue { get; private set; }
         public Transform ClothingRug { get; private set; }
         public Transform HomeRug { get; private set; }
@@ -22,6 +25,10 @@ namespace NightSupermarket.Game
         /// <summary>Set by the root: true when no guard or shopper can see this player.</summary>
         public Func<PlayerMotor, bool> Unwatched = _ => true;
         public Action<string> Toast = _ => { };
+        /// <summary>The pose a player is holding right now (null when not posing); gems behind displays need it.</summary>
+        public Func<PlayerMotor, Stance?> HeldPose = _ => null;
+        public Action<Gem, PlayerMotor> GemCollected = (_, __) => { };
+        public readonly List<Gem> Gems = new List<Gem>();
         /// <summary>The window job's zone, which starts by itself; the HUD shows its progress since no E is involved.</summary>
         public HoldSpot Window => window;
 
@@ -80,6 +87,7 @@ namespace NightSupermarket.Game
             BuildModelStand();
             if (!solo) BuildRescue();
             BuildExit();
+            BuildGems();
             foreach (var job in Jobs)
                 switch (job.Id)
                 {
@@ -103,18 +111,32 @@ namespace NightSupermarket.Game
         /// Safety net after the NavMesh bakes: any loose item whose spot is not on walkable floor (inside a
         /// shelf, say) slides to the nearest walkable point, so the gold marker never points into furniture.
         /// </summary>
+        private static readonly Collider[] overlaps = new Collider[8];
+        /// <summary>
+        /// Moves any loose item whose body overlaps store furniture (a crate spawned inside a shelf) to the
+        /// nearest open floor. Items resting ON a table or shelf top are left alone: the test is a physics
+        /// overlap of the item's own box shrunk a little, not distance to the NavMesh, because the NavMesh is
+        /// eroded by the agent radius and would count every table-top item as "inside".
+        /// </summary>
         public int SnapLooseItemsToFloor()
         {
             int moved = 0;
             foreach (var item in PhysicalItem.Active)
             {
                 if (item == null || item.Holder != null) continue;
-                Vector3 at = item.transform.position;
-                if (!UnityEngine.AI.NavMesh.SamplePosition(at, out var hit, 2.5f, UnityEngine.AI.NavMesh.AllAreas)) continue;
-                Vector3 flat = new Vector3(hit.position.x - at.x, 0, hit.position.z - at.z);
-                if (flat.magnitude < 0.45f) continue; // already beside or on open floor (tables and shelves tops count)
-                // Keep its height (it may sit on a table) but move it out over open floor, a little past the edge.
-                Vector3 target = new Vector3(hit.position.x, at.y, hit.position.z) + flat.normalized * 0.35f;
+                var box = item.GetComponent<Collider>();
+                if (box == null) continue;
+                var bounds = box.bounds;
+                Vector3 half = Vector3.Max(bounds.extents - Vector3.one * 0.04f, Vector3.one * 0.01f);
+                int count = Physics.OverlapBoxNonAlloc(bounds.center, half, overlaps, Quaternion.identity, 1, QueryTriggerInteraction.Ignore);
+                bool buried = false;
+                for (int i = 0; i < count && !buried; i++)
+                    buried = overlaps[i] != box && !overlaps[i].transform.IsChildOf(item.transform) && overlaps[i].GetComponentInParent<PhysicalItem>() == null;
+                if (!buried) continue;
+                if (!UnityEngine.AI.NavMesh.SamplePosition(bounds.center, out var hit, 3f, UnityEngine.AI.NavMesh.AllAreas)) continue;
+                Vector3 flat = new Vector3(hit.position.x - bounds.center.x, 0, hit.position.z - bounds.center.z);
+                Vector3 away = flat.sqrMagnitude > 0.001f ? flat.normalized : Vector3.forward;
+                Vector3 target = new Vector3(hit.position.x, hit.position.y + bounds.extents.y + 0.02f, hit.position.z) + away * 0.35f;
                 item.transform.position = target;
                 if (item.Body != null) { item.Body.position = target; item.Body.linearVelocity = Vector3.zero; }
                 moved++;
@@ -219,11 +241,48 @@ namespace NightSupermarket.Game
         private void BuildExit()
         {
             var exit = PrimitiveWorld.Box(root, "Escape door", new Vector3(5, 1.3f, -14.6f), new Vector3(1.4f, 2.4f, 0.3f), new Color(0.8f, 0.2f, 0.7f));
-            exit.AddComponent<EscapeInteractable>().Configure(authority, "");
+            var front = exit.AddComponent<EscapeInteractable>();
+            front.Configure(authority, "");
+            front.BlockedPrompt = "Shutter down. The FIRE EXIT is upstairs — take the escalator.";
             Escape = exit.transform;
+            Shutter = FrontShutter.Create(root, front, new Vector3(5f, 0f, -14.3f));
+            // The fire exit door is store geometry (PrimitiveWorld.FireExit); it only needs the interaction.
+            var fire = GameObject.Find("Fire exit");
+            if (fire != null)
+            {
+                fire.AddComponent<EscapeInteractable>().Configure(authority, "");
+                FireExit = fire.transform;
+                ObjectiveDressing.Sign(root, "FIRE EXIT · E", PrimitiveWorld.FireExit + new Vector3(0, 1.1f, -0.35f), 0f, new Color(0.1f, 0.5f, 0.25f), Color.white, 1.4f, 0.12f);
+            }
             if (!ObjectiveDressing.Dress(exit, "rollershutter_door", 2.4f, 0f, new Color(0.2f, 0.42f, 0.3f)))
                 ObjectiveDressing.Recolor(exit, new Color(0.2f, 0.42f, 0.3f), 0.5f);
             ObjectiveDressing.Sign(root, "EXIT", new Vector3(5f, 2.72f, -14.3f), 0f, new Color(0.1f, 0.5f, 0.25f), Color.white, 1.4f, 0.16f);
+        }
+
+        // ---------------- gems ----------------
+
+        /// <summary>Every hiding spot in the store. The shift picks GemPlan.PerNight of them, at least one pose-gated.</summary>
+        public static readonly (Vector3 at, Stance pose)[] GemSpots =
+        {
+            (new Vector3(-13.6f, 0.25f, -12.6f), Stance.Neutral),    // 0 corner behind the produce tables
+            (new Vector3(6.5f, 0.25f, -13.0f), Stance.Neutral),      // 1 between the escape door and checkout 1
+            (new Vector3(-4.2f, 0.4f, 13.55f), Stance.Display),      // 2 on the mannequin platform, among the displays
+            (new Vector3(13.5f, 0.3f, -2.7f), Stance.Lounging),      // 3 by the sofa in Home
+            (new Vector3(-1.2f, 0.25f, 4.1f), Stance.Neutral),       // 4 at the end of the middle shelf
+            (new Vector3(-14.2f, 0.3f, 3.4f), Stance.Neutral),       // 5 past the bakery shelf
+            (new Vector3(10.0f, 0.3f, -7.4f), Stance.Neutral),       // 6 between Home and the checkouts
+            (new Vector3(4.2f, 0.3f, 13.75f), Stance.Browsing),      // 7 under the TV ledge in Electronics
+            (new Vector3(2.2f, PrimitiveWorld.UpstairsY + 0.25f, 13.8f), Stance.Neutral),   // 8 upstairs, under the gallery TV ledge
+            (new Vector3(14.45f, PrimitiveWorld.UpstairsY + 0.25f, 8.0f), Stance.Neutral),  // 9 upstairs, by the east wall past the sofa
+            (new Vector3(10.4f, PrimitiveWorld.UpstairsY + 0.3f, 9.4f), Stance.Lounging),   // 10 upstairs, on the lounge rug
+            (new Vector3(-0.6f, PrimitiveWorld.UpstairsY + 0.25f, 14.6f), Stance.Neutral),  // 11 upstairs, landing corner
+        };
+        public static readonly int[] GatedSpots = { 2, 3, 7, 10 };
+
+        private void BuildGems()
+        {
+            foreach (int index in GemPlan.Pick(shift, GemSpots.Length, GemPlan.PerNight, GatedSpots))
+                Gems.Add(Gem.Create(root, index, GemSpots[index].at, GemSpots[index].pose, HeldPose, GemCollected));
         }
 
         // ---------------- jobs ----------------

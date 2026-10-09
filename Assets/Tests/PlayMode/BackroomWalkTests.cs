@@ -50,5 +50,30 @@ namespace NightSupermarket.Tests
             Assert.That(total, Is.GreaterThan(0));
             Assert.That(facing, Is.EqualTo(total), "every hall label reads for a player walking toward +Z");
         }
+
+        /// <summary>A captive is not "Free", yet must be able to use the hall's doors, gaps, figures and tags.</summary>
+        [UnityTest] public IEnumerator ACaptiveCanUseTheFirstRoomsStation()
+        {
+            PrototypeRoot.NextShift = 0;
+            yield return SceneManager.LoadSceneAsync("Prototype"); yield return null;
+            var root = Object.FindAnyObjectByType<PrototypeRoot>();
+            var player = root.Player;
+            Assert.That(root.Authority.TryCapture(player.Record.Id), Is.True);
+            yield return new WaitForFixedUpdate();
+            Assert.That(player.Record.InBackroom, Is.True);
+            BackroomUse station = null;
+            foreach (var use in Object.FindObjectsByType<BackroomUse>(FindObjectsSortMode.None))
+                if (use.Room == 0 && use.gameObject.activeInHierarchy && (station == null || use.transform.position.z < station.transform.position.z)) station = use;
+            Assert.That(station, Is.Not.Null, "room 1 has no station to use");
+            Vector3 target = station.GetComponent<Collider>().bounds.center;
+            player.Teleport(new Vector3(target.x, 0.1f, target.z - 1.6f));
+            player.transform.rotation = Quaternion.identity;
+            Physics.SyncTransforms();
+            var probe = player.GetComponent<InteractionProbe>();
+            var view = player.GetComponent<PlayerView>();
+            var found = probe.FindTarget(view.View.transform.position, (target - view.View.transform.position).normalized);
+            Assert.That(found, Is.SameAs(station), "looking at " + station.name + " from 1.6 m offers nothing");
+            Assert.That(string.IsNullOrEmpty(station.PromptFor(player)), Is.False, "the station has no prompt for the captive");
+        }
     }
 }

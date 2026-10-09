@@ -24,17 +24,19 @@ namespace NightSupermarket.Game
         private Text scoreText, multiplierText, shiftText, tacticsText;
         private Text poseName, poseNote;
         private Text bannerTitle, bannerDetail;
-        private Text endTitle, endGrade, endDetail, endFooter;
+        private Text endTitle, endGrade, endDetail, endFooter, boardTitle, boardName, boardNote;
         private Text nightCopy, packCopy, reportCopy, cameraCopy, cameraNote;
         private Image streakFill, strainFill, vignette, bannerDim;
         private readonly Image[] pips = new Image[3];
-        private Transform missionList, controlList, scoreList;
+        private Transform missionList, controlList, scoreList, boardList;
         private readonly List<Row> missionRows = new List<Row>();
         private readonly List<Row> controlRows = new List<Row>();
         private readonly List<Row> scoreRows = new List<Row>();
+        private readonly List<Row> boardRows = new List<Row>();
         private readonly Image[] tabs = new Image[6];
         private readonly Text[] tabLabels = new Text[6];
-        private RectTransform mapRoot, markRoot;
+        private RectTransform mapRoot, markRoot, upstairsRoot, upstairsMarkRoot;
+        private const float InsetWidth = 256f, InsetHeight = 160f;
         private readonly List<Image> marks = new List<Image>();
         private sealed class Row
         {
@@ -91,7 +93,7 @@ namespace NightSupermarket.Game
             phaseLine.text = string.IsNullOrEmpty(model.PhaseCountdown) ? model.PhaseLabel ?? "" : model.PhaseLabel + "   " + model.PhaseCountdown;
 
             // Top left: who can see you.
-            guardText.text = "GUARD   " + model.Detection;
+            guardText.text = (string.IsNullOrEmpty(model.GuardName) ? "GUARD" : model.GuardName) + "   " + model.Detection;
             guardText.color = UiTheme.Hex(model.DetectionTint);
             for (int i = 0; i < pips.Length; i++)
             {
@@ -162,7 +164,15 @@ namespace NightSupermarket.Game
                 endGrade.text = model.Grade ?? "";
                 endDetail.text = model.EndDetail ?? "";
                 FillRows(scoreRows, scoreList, model.ScoreLines, RowStyle.Score);
-                endFooter.text = "ENTER  play shift #" + model.Shift + " again        N  new shift";
+                FillRows(boardRows, boardList, model.BoardLines, RowStyle.Board);
+                boardTitle.text = model.BoardTitle ?? "";
+                boardNote.text = model.BoardNote ?? "";
+                bool blink = model.EditingName && Mathf.Repeat(Time.unscaledTime, 1f) < 0.5f;
+                boardName.text = model.EditingName
+                    ? "Name:  " + (model.PlayerName ?? "") + (blink ? "|" : " ") + "     ENTER saves"
+                    : "Name:  " + (model.PlayerName ?? "") + "     TAB to change";
+                boardName.color = model.EditingName ? UiTheme.Gold : UiTheme.Ink;
+                endFooter.text = model.EditingName ? "Type your name, then ENTER" : "ENTER  play shift #" + model.Shift + " again        N  new shift        TAB  change name";
             }
 
             if (!MenuOpen) return;
@@ -311,8 +321,9 @@ namespace NightSupermarket.Game
             UiTheme.Stretch(endRoot.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             var dim = UiTheme.Fill(endRoot.transform, "Dim", new Color(0, 0, 0, 0.6f));
             UiTheme.Stretch(dim, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            // 1100 x 690: score breakdown on the left, the shift's leaderboard on the right.
             var card = UiTheme.Fill(endRoot.transform, "Card", UiTheme.Glass, UiTheme.Round);
-            UiTheme.Stretch(card, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-400, -345), new Vector2(400, 345));
+            UiTheme.Stretch(card, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-550, -345), new Vector2(550, 345));
             var accent = UiTheme.Fill(card.transform, "Accent", UiTheme.Coral);
             UiTheme.Stretch(accent, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -6), Vector2.zero);
             endTitle = UiTheme.Label(card.transform, "Title", 64, UiTheme.Good, TextAnchor.MiddleLeft, header: true);
@@ -321,12 +332,24 @@ namespace NightSupermarket.Game
             UiTheme.Pin(endGrade, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -20), new Vector2(240, 170));
             endDetail = UiTheme.Label(card.transform, "Detail", 21, UiTheme.Mute, TextAnchor.UpperLeft);
             endDetail.horizontalOverflow = HorizontalWrapMode.Wrap;
-            UiTheme.Pin(endDetail, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -118), new Vector2(500, 70));
+            UiTheme.Pin(endDetail, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -118), new Vector2(740, 70));
             scoreList = new GameObject("Score lines", typeof(RectTransform)).transform;
             scoreList.SetParent(card.transform, false);
-            UiTheme.Stretch(scoreList.GetComponent<RectTransform>(), new Vector2(0, 0), new Vector2(1, 1), new Vector2(40, 96), new Vector2(-40, -200));
+            UiTheme.Stretch(scoreList.GetComponent<RectTransform>(), new Vector2(0, 0), new Vector2(0, 1), new Vector2(40, 96), new Vector2(560, -200));
+            var divider = UiTheme.Fill(card.transform, "Divider", new Color(1, 1, 1, 0.08f));
+            UiTheme.Stretch(divider, new Vector2(0, 0), new Vector2(0, 1), new Vector2(582, 96), new Vector2(584, -200));
+            boardTitle = UiTheme.Label(card.transform, "Board title", 22, UiTheme.Gold, TextAnchor.MiddleLeft, header: true);
+            UiTheme.Pin(boardTitle, new Vector2(0, 1), new Vector2(0, 1), new Vector2(606, -200), new Vector2(454, 30));
+            boardList = new GameObject("Board lines", typeof(RectTransform)).transform;
+            boardList.SetParent(card.transform, false);
+            UiTheme.Stretch(boardList.GetComponent<RectTransform>(), new Vector2(0, 0), new Vector2(0, 1), new Vector2(606, 150), new Vector2(1060, -236));
+            boardName = UiTheme.Label(card.transform, "Board name", 20, UiTheme.Ink, TextAnchor.MiddleLeft);
+            UiTheme.Pin(boardName, new Vector2(0, 0), new Vector2(0, 0), new Vector2(606, 118), new Vector2(454, 30));
+            boardNote = UiTheme.Label(card.transform, "Board note", 17, UiTheme.Mute, TextAnchor.UpperLeft);
+            boardNote.horizontalOverflow = HorizontalWrapMode.Wrap;
+            UiTheme.Pin(boardNote, new Vector2(0, 0), new Vector2(0, 0), new Vector2(606, 84), new Vector2(454, 34));
             endFooter = UiTheme.Label(card.transform, "Footer", 22, UiTheme.Gold, TextAnchor.MiddleCenter, bold: true);
-            UiTheme.Pin(endFooter, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(720, 36));
+            UiTheme.Pin(endFooter, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1000, 36));
             endRoot.SetActive(false);
         }
 
@@ -406,8 +429,19 @@ namespace NightSupermarket.Game
             markRoot.SetParent(mapRoot, false);
             UiTheme.Stretch(markRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             var legend = UiTheme.Label(cameras, "Legend", 18, UiTheme.Mute, TextAnchor.UpperLeft);
-            UiTheme.Pin(legend, new Vector2(0, 1), new Vector2(0, 1), new Vector2(MapSize + 24, -84), new Vector2(300, 240));
-            legend.text = "Gold   your next job\nPurple   optional swaps\nWhite   you and friends\nAmber   shoppers\nRed   guard\nYellow   last report";
+            UiTheme.Pin(legend, new Vector2(0, 1), new Vector2(0, 1), new Vector2(MapSize + 24, -84), new Vector2(300, 150));
+            legend.text = "Gold   your next job\nPurple   optional swaps\nWhite   you and friends\nAmber   shoppers\nRed   guard\nYellow   last report\nCyan   gems (after lights out)";
+            // Upstairs inset: x -1..15, z 5..15 at 16 px per metre, below the legend.
+            var upTitle = UiTheme.Label(cameras, "Upstairs title", 18, UiTheme.Gold, TextAnchor.UpperLeft, bold: true);
+            UiTheme.Pin(upTitle, new Vector2(0, 1), new Vector2(0, 1), new Vector2(MapSize + 24, -256), new Vector2(300, 24));
+            upTitle.text = "UPSTAIRS  (escalator by Clothing)";
+            upstairsRoot = UiTheme.Fill(cameras, "Upstairs", new Color(0.12f, 0.12f, 0.13f, 1f), UiTheme.Round).rectTransform;
+            UiTheme.Pin(upstairsRoot.GetComponent<Image>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(MapSize + 24, -282), new Vector2(InsetWidth, InsetHeight));
+            AddInsetZone(upstairsRoot, "Home & Electronics", 1, 5, 15, 15, "#2EB8DB");
+            AddInsetZone(upstairsRoot, "", -1, 5, 1, 15, "#8C8C8C");
+            upstairsMarkRoot = new GameObject("Upstairs marks", typeof(RectTransform)).GetComponent<RectTransform>();
+            upstairsMarkRoot.SetParent(upstairsRoot, false);
+            UiTheme.Stretch(upstairsMarkRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             menuRoot.SetActive(false);
         }
 
@@ -427,25 +461,26 @@ namespace NightSupermarket.Game
             return column;
         }
 
-        private enum RowStyle { Mission, Key, Score }
+        private enum RowStyle { Mission, Key, Score, Board }
 
         private static Row MakeRow(Transform parent, RowStyle style)
         {
             var row = new Row();
             row.Root = UiTheme.Fill(parent, "Row", new Color(1, 1, 1, 0.05f), UiTheme.Round).gameObject;
-            int left = style == RowStyle.Key ? 136 : style == RowStyle.Mission ? 70 : 16;
+            int left = style == RowStyle.Key ? 136 : style == RowStyle.Mission ? 70 : style == RowStyle.Board ? 54 : 16;
             if (style != RowStyle.Score)
             {
                 var key = UiTheme.Fill(row.Root.transform, "Key", new Color(0.18f, 0.14f, 0.07f, 1f), UiTheme.Round);
-                UiTheme.Pin(key, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(8, 0), new Vector2(style == RowStyle.Mission ? 46 : 118, style == RowStyle.Key ? 32 : 38));
+                UiTheme.Pin(key, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(8, 0), new Vector2(style == RowStyle.Mission ? 46 : style == RowStyle.Board ? 38 : 118, style == RowStyle.Key ? 32 : style == RowStyle.Board ? 28 : 38));
                 row.Key = UiTheme.Label(key.transform, "K", 19, UiTheme.Gold, TextAnchor.MiddleCenter, bold: true, shadow: false);
                 UiTheme.Stretch(row.Key, Vector2.zero, Vector2.one, new Vector2(4, 0), new Vector2(-4, 0));
             }
             // Title sits in the top half, detail in the bottom half: they never overlap.
             row.Title = UiTheme.Label(row.Root.transform, "Title", style == RowStyle.Score ? 22 : 23, UiTheme.Ink, TextAnchor.MiddleLeft, bold: style != RowStyle.Score);
             row.Detail = UiTheme.Label(row.Root.transform, "Detail", 18, UiTheme.Mute, TextAnchor.MiddleLeft);
-            if (style == RowStyle.Score)
+            if (style == RowStyle.Score || style == RowStyle.Board)
             {
+                if (style == RowStyle.Board) { row.Title.fontSize = 20; row.Key.fontSize = 18; }
                 UiTheme.Stretch(row.Title, Vector2.zero, Vector2.one, new Vector2(left, 0), new Vector2(-120, 0));
                 row.Detail.alignment = TextAnchor.MiddleRight;
                 row.Detail.fontSize = 22;
@@ -468,8 +503,8 @@ namespace NightSupermarket.Game
         private static void FillRows(List<Row> rows, Transform parent, List<HudLine> lines, RowStyle style)
         {
             while (rows.Count < lines.Count) rows.Add(MakeRow(parent, style));
-            float height = style == RowStyle.Score ? 36 : style == RowStyle.Key ? 44 : 66;
-            float width = style == RowStyle.Mission ? 940 : style == RowStyle.Key ? 470 : 720;
+            float height = style == RowStyle.Score || style == RowStyle.Board ? 36 : style == RowStyle.Key ? 44 : 66;
+            float width = style == RowStyle.Mission ? 940 : style == RowStyle.Key ? 470 : style == RowStyle.Board ? 454 : 520;
             // Key rows run in two columns so 20 bindings fit the card; the split is half the list, rounded up.
             int perColumn = style == RowStyle.Key ? Mathf.Max(1, (lines.Count + 1) / 2) : int.MaxValue;
             for (int i = 0; i < rows.Count; i++)
@@ -495,6 +530,16 @@ namespace NightSupermarket.Game
                     rows[i].Title.text = line.Detail;
                     rows[i].Detail.text = "";
                 }
+                else if (style == RowStyle.Board)
+                {
+                    // Rank badge, name, points. Done marks the local player's own row.
+                    rows[i].Key.text = (i + 1).ToString();
+                    rows[i].Key.color = i == 0 ? UiTheme.Gold : UiTheme.Mute;
+                    rows[i].Title.text = line.Title;
+                    rows[i].Title.color = line.Done ? UiTheme.Good : UiTheme.Ink;
+                    rows[i].Detail.text = line.Detail;
+                    rows[i].Detail.color = line.Done ? UiTheme.Good : UiTheme.Ink;
+                }
                 else
                 {
                     rows[i].Title.text = line.Title;
@@ -515,6 +560,20 @@ namespace NightSupermarket.Game
             AddZone(map, "Warehouse", -15, 8, -8, 11.6f, "#387AE0");
             AddZone(map, "Security", -15, 11.6f, -8, 15, "#EB6B9E");
             AddZone(map, "Staff", 8, 5, 15, 15, "#8C61D1");
+        }
+
+        private static void AddInsetZone(RectTransform map, string name, float x0, float z0, float x1, float z1, string hex)
+        {
+            float px = (x0 + 1f) / 16f * InsetWidth, pz = (z0 - 5f) / 10f * InsetHeight;
+            var image = UiTheme.Fill(map, name.Length > 0 ? name : "Landing", UiTheme.Hex(hex) * new Color(1, 1, 1, 0.55f));
+            var rect = image.rectTransform;
+            rect.anchorMin = rect.anchorMax = Vector2.zero; rect.pivot = Vector2.zero;
+            rect.anchoredPosition = new Vector2(px, pz);
+            rect.sizeDelta = new Vector2((x1 - x0) / 16f * InsetWidth, (z1 - z0) / 10f * InsetHeight);
+            if (name.Length == 0) return;
+            var label = UiTheme.Label(image.transform, "L", 18, Color.white, TextAnchor.MiddleCenter, bold: true);
+            UiTheme.Stretch(label, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            label.text = name;
         }
 
         private static void AddZone(RectTransform map, string name, float x0, float z0, float x1, float z1, string hex)
@@ -565,9 +624,12 @@ namespace NightSupermarket.Game
                 var mark = model.Marks[i];
                 marks[i].color = UiTheme.Hex(mark.Tint);
                 var rect = marks[i].rectTransform;
+                rect.SetParent(mark.Upstairs ? upstairsMarkRoot : markRoot, false);
                 rect.anchorMin = rect.anchorMax = new Vector2(0, 0);
                 rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.anchoredPosition = new Vector2((mark.X + 15f) / 30f * MapSize, (mark.Z + 15f) / 30f * MapSize);
+                rect.anchoredPosition = mark.Upstairs
+                    ? new Vector2((mark.X + 1f) / 16f * InsetWidth, (mark.Z - 5f) / 10f * InsetHeight)
+                    : new Vector2((mark.X + 15f) / 30f * MapSize, (mark.Z + 15f) / 30f * MapSize);
                 bool big = mark.Label == "Rescue" || mark.Label == "Bell" || mark.Tint == "#F4C15D" && !string.IsNullOrEmpty(mark.Label);
                 rect.sizeDelta = big ? new Vector2(20, 20) : new Vector2(14, 14);
             }
@@ -591,15 +653,16 @@ namespace NightSupermarket.Game
 
         private static string NightPage(HudModel model)
         {
-            return "How tonight works\n\n" +
-                "You are a mannequin. People only notice you when you move while they look.\n" +
-                "Freeze when the guard or a shopper turns your way. Hold RIGHT MOUSE for a pose that fits the department: it buys extra doubt.\n" +
-                "Finish the jobs, then reach the exit before dawn. The store darkens as the night goes on.\n" +
-                (model.Solo ? "Caught? You wake in the back hall. Clear 3 rooms to return. Only dawn ends the night.\n" : "Caught? Clear the back hall, or a teammate frees you from the warehouse console.\n") +
-                "\n" + model.Role + "    " + model.BodyState + "\n" +
-                "Guard    " + model.Detection + "\nPeople    " + model.Crowd + "\n" +
-                "Score    " + model.Score.ToString("N0") + "      Clock    " + model.Clock + "\n\n" +
-                "Pages on the left: Missions, Inventory, Reports, " + (model.Solo ? "Store map" : "Cameras") + ", Controls.";
+            return "How tonight works\n" +
+                "You are a mannequin: people only notice you when you move while they look. Freeze when anyone turns your way; hold RIGHT MOUSE for a pose that fits the department (extra doubt). " +
+                "Finish the jobs, then get out before dawn. At lockdown the front shutter drops and the FIRE EXIT upstairs (escalator by Clothing) is the only way out. " +
+                (model.Solo ? "Caught? You wake in the back hall: clear 3 rooms to return." : "Caught? Clear the back hall, or a teammate frees you from the warehouse console.") +
+                " C cycles the camera.\n" +
+                (string.IsNullOrEmpty(model.GuardTell) ? "" : "Tonight's guard: " + model.GuardTell + "\n") +
+                model.Role + "    " + model.BodyState + "      Guard  " + model.Detection + "      People  " + model.Crowd +
+                "      Score  " + model.Score.ToString("N0") + "      Clock  " + model.Clock + "\n" +
+                (string.IsNullOrEmpty(model.GemText) ? "" : model.GemText + "\n") +
+                (string.IsNullOrEmpty(model.WardrobeText) ? "" : "\n" + model.WardrobeText);
         }
 
         private static string ListPage(List<HudLine> lines, string title, string empty)

@@ -31,7 +31,7 @@ namespace NightSupermarket.Core
             GameRules.RequirePositive(duration, nameof(duration));
             double share = Math.Max(0, remaining) / duration;
             if (remaining <= 0) return new NightMoment(NightPhase.Dawn, LightingMode.Dawn, 1, 0, false, "Dawn. The store opens.");
-            if (share <= LockdownAt) return new NightMoment(NightPhase.Lockdown, LightingMode.Emergency, 1.4, 0, true, "Lockdown. Emergency lights. Get out.");
+            if (share <= LockdownAt) return new NightMoment(NightPhase.Lockdown, LightingMode.Emergency, 1.4, 0, true, "Lockdown. Front shutter down — the fire exit is upstairs.");
             if (share <= DarkAt) return new NightMoment(NightPhase.Dark, LightingMode.Dark, 1.25, 0.15, true, "Lights out. The guard has a torch and a quicker step.");
             if (share <= ClosingAt) return new NightMoment(NightPhase.Closing, LightingMode.Partial, 1.1, 0.5, false, "Closing time. Shoppers are leaving; fewer eyes, longer patrols.");
             return new NightMoment(NightPhase.Open, LightingMode.Normal, 1, 1, false, "Store open. Crowds hide you and watch you.");

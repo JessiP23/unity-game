@@ -106,13 +106,14 @@ namespace NightSupermarket.Game
         public static void TvWall(Transform parent, StoreLighting lighting, Vector3 center, Vector3 size, Random rng)
         {
             float front = center.z - size.z * 0.5f;
-            Panel(parent, "TV ledge", new Vector3(center.x, 1.0f, front - 0.2f), new Vector3(size.x, 0.05f, 0.45f)).sharedMaterial = ArtLibrary.Lit(new Color(0.1f, 0.1f, 0.11f), 0.5f);
+            float floor = center.y - size.y * 0.5f; // the same wall stands on the ground floor and on the mezzanine
+            Panel(parent, "TV ledge", new Vector3(center.x, floor + 1.0f, front - 0.2f), new Vector3(size.x, 0.05f, 0.45f)).sharedMaterial = ArtLibrary.Lit(new Color(0.1f, 0.1f, 0.11f), 0.5f);
             Color[] glows = { new Color(0.3f, 0.55f, 1f), new Color(0.4f, 1f, 0.6f), new Color(1f, 0.6f, 0.3f), new Color(0.8f, 0.4f, 1f) };
             for (int row = 0; row < 2; row++)
                 for (int i = 0; i < 4; i++)
                 {
                     float x = center.x - size.x * 0.5f + 0.8f + i * 1.6f;
-                    float y = row == 0 ? 1.03f : center.y + size.y * 0.5f;
+                    float y = row == 0 ? floor + 1.03f : center.y + size.y * 0.5f;
                     float z = row == 0 ? front - 0.2f : center.z;
                     string id = (i + row) % 2 == 0 ? "Television_01" : "television_02";
                     var tv = ArtLibrary.Spawn(id, parent, new Vector3(x, y, z), 180);
@@ -122,7 +123,7 @@ namespace NightSupermarket.Game
                     Panel(parent, "TV screen", new Vector3(x, bounds.center.y + bounds.size.y * 0.06f, bounds.min.z - 0.005f), new Vector3(bounds.size.x * 0.62f, bounds.size.y * 0.5f, 0.005f))
                         .sharedMaterial = ArtLibrary.Emissive(glow, 1.4f);
                 }
-            lighting.AddGlow(new Vector3(center.x, 1.6f, front - 0.8f), new Color(0.45f, 0.75f, 1f), 3.2f, 0.4f);
+            lighting.AddGlow(new Vector3(center.x, floor + 1.6f, front - 0.8f), new Color(0.45f, 0.75f, 1f), 3.2f, 0.4f);
         }
 
         public static void GadgetTable(Transform parent, Vector3 center, Vector3 size, Random rng)
@@ -147,6 +148,20 @@ namespace NightSupermarket.Game
                 ArtLibrary.Spawn("wooden_display_shelves_01", unit, Vector3.zero, 0);
                 foreach (float level in new[] { 0.38f, 0.80f, 1.16f, 1.56f }) Stock(unit, level, 0.46f, 0.14f, decor, rng);
             }
+        }
+
+        /// <summary>The upstairs showroom: a sofa set around a rug, where the Lounging pose belongs.</summary>
+        public static void Lounge(Transform parent, Vector3 rug)
+        {
+            float y = rug.y;
+            Solid(ArtLibrary.Spawn("sofa_02", parent, new Vector3(rug.x + 2.0f, y, rug.z), -90));
+            Solid(ArtLibrary.Spawn("coffee_table_round_01", parent, new Vector3(rug.x + 0.2f, y, rug.z), 0));
+            Solid(ArtLibrary.Spawn("ArmChair_01", parent, new Vector3(rug.x - 0.2f, y, rug.z + 1.9f), 160));
+            Solid(ArtLibrary.Spawn("modern_arm_chair_01", parent, new Vector3(rug.x - 0.2f, y, rug.z - 1.9f), 20));
+            Solid(ArtLibrary.Spawn("side_table_01", parent, new Vector3(rug.x + 2.1f, y, rug.z + 1.7f), -90));
+            ArtLibrary.Spawn("desk_lamp_arm_01", parent, new Vector3(rug.x + 2.1f, y + 0.55f, rug.z + 1.7f), -120);
+            Solid(ArtLibrary.Spawn("Ottoman_01", parent, new Vector3(rug.x - 1.6f, y, rug.z + 0.6f), 10));
+            ArtLibrary.Spawn("ceramic_vase_01", parent, new Vector3(rug.x + 0.2f, y + 0.42f, rug.z), 0);
         }
 
         public static void LivingRoom(Transform parent)

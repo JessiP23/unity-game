@@ -39,7 +39,7 @@ namespace NightSupermarket.Game
         {
             ZoneVolume best = null;
             foreach (var zone in zones)
-                if (zone.Bounds.Contains(new Vector3(position.x, zone.transform.position.y, position.z)) && (best == null || zone.Area < best.Area)) best = zone;
+                if (zone.Bounds.Contains(position) && (best == null || zone.Area < best.Area)) best = zone;
             return best != null ? best.zone : (ZoneType?)null;
         }
 

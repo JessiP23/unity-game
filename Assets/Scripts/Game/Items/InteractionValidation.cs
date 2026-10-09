@@ -5,7 +5,8 @@ namespace NightSupermarket.Game
     {
         public static bool CanReach(PlayerMotor player, Transform target)
         {
-            if (player == null || player.Record == null || !player.Record.Free) return false;
+            // A captive in the back hall is not Free, but the hall's doors, gaps, figures and tags are its only way out.
+            if (player == null || player.Record == null || (!player.Record.Free && !player.Record.InBackroom)) return false;
             Vector3 origin = player.transform.position + Vector3.up;
             Vector3 delta = target.position - origin;
             if (delta.magnitude > player.Rules.interactionDistance) return false;

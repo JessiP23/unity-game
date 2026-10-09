@@ -15,6 +15,7 @@ namespace NightSupermarket.Core
             ZoneType.Electronics => Stance.Browsing,
             ZoneType.Supermarket => Stance.Browsing,
             ZoneType.Home => Stance.Lounging,
+            ZoneType.Mezzanine => Stance.Lounging,
             ZoneType.Checkout => Stance.Staff,
             ZoneType.CustomerService => Stance.Staff,
             ZoneType.Employee => Stance.Staff,
@@ -35,7 +36,7 @@ namespace NightSupermarket.Core
         {
             Stance.Display => "arms out, chin up — Clothing",
             Stance.Browsing => "hand on a shelf — Aisles, Electronics",
-            Stance.Lounging => "leaning, relaxed — Home",
+            Stance.Lounging => "leaning, relaxed — Home, Upstairs",
             Stance.Staff => "hands behind the back — Checkout, Staff rooms",
             _ => "just standing"
         };

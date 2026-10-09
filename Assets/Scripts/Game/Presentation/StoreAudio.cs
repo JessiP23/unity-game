@@ -9,7 +9,7 @@ namespace NightSupermarket.Game
     public sealed class StoreAudio : MonoBehaviour
     {
         private const int Rate = 22050;
-        private static AudioClip stepClip, chimeClip, askClip, chaseClip, catchClip, whistleClip, heartClip, exhaleClip;
+        private static AudioClip stepClip, chimeClip, askClip, chaseClip, catchClip, whistleClip, heartClip, exhaleClip, clunkClip, shutterClip, gemClip;
         private AudioSource steps, chime, radio, heart;
         private float nextBeat;
         private System.IDisposable cueSubscription;
@@ -102,6 +102,13 @@ namespace NightSupermarket.Game
             nextBeat = Time.unscaledTime + interval;
         }
 
+        /// <summary>A shopper's phone camera: two quick clicks.</summary>
+        public void Shutter()
+        {
+            if (chime == null || stepClip == null) return;
+            chime.pitch = 1.9f; chime.PlayOneShot(stepClip, 0.5f); chime.pitch = 1f;
+        }
+
         /// <summary>The breath you let out when a watcher looks away. The "safe again" cue.</summary>
         public void Exhale()
         {
@@ -192,7 +199,60 @@ namespace NightSupermarket.Game
             if (whistleClip == null) whistleClip = Whistle();
             if (heartClip == null) heartClip = Heart();
             if (exhaleClip == null) exhaleClip = Exhale_();
+            if (clunkClip == null) clunkClip = Clunk();
+            if (shutterClip == null) shutterClip = ShutterRoll();
+            if (gemClip == null) gemClip = GemChime();
         }
+
+        /// <summary>A bank of fluorescent tubes switching off: a relay clunk and a fading hum.</summary>
+        private static AudioClip Clunk()
+        {
+            int count = (int)(Rate * 0.45f);
+            var data = new float[count];
+            var rng = new System.Random(3);
+            for (int i = 0; i < count; i++)
+            {
+                float time = i / (float)Rate;
+                float thud = Mathf.Sin(i * 70f * Mathf.PI * 2f / Rate) * Mathf.Exp(-time * 22f) * 0.6f;
+                float click = (float)(rng.NextDouble() * 2 - 1) * Mathf.Exp(-time * 90f) * 0.35f;
+                float hum = Mathf.Sin(i * 120f * Mathf.PI * 2f / Rate) * Mathf.Exp(-time * 6f) * 0.12f;
+                data[i] = thud + click + hum;
+            }
+            return Clip("Light clunk", data);
+        }
+
+        /// <summary>The front roller shutter coming down: two seconds of rattling slats and a final bang.</summary>
+        private static AudioClip ShutterRoll()
+        {
+            int count = (int)(Rate * 2.4f);
+            var data = new float[count];
+            var rng = new System.Random(9);
+            for (int i = 0; i < count; i++)
+            {
+                float time = i / (float)Rate;
+                float rattle = (float)(rng.NextDouble() * 2 - 1) * 0.22f * (0.6f + 0.4f * Mathf.Sin(time * 38f));
+                float motor = Mathf.Sin(i * 55f * Mathf.PI * 2f / Rate) * 0.14f;
+                float gate = time < 2.1f ? 1f : 0f;
+                float bang = time >= 2.1f ? Mathf.Sin(i * 48f * Mathf.PI * 2f / Rate) * Mathf.Exp(-(time - 2.1f) * 14f) * 0.8f : 0f;
+                data[i] = (rattle + motor) * gate + bang;
+            }
+            return Clip("Shutter", data);
+        }
+
+        /// <summary>Picking up a gem: a bright rising triad.</summary>
+        private static AudioClip GemChime()
+        {
+            int count = (int)(Rate * 0.7f);
+            var data = new float[count];
+            Tone(data, 0, (int)(Rate * 0.3f), 1318f, 0.2f);
+            Tone(data, (int)(Rate * 0.1f), (int)(Rate * 0.3f), 1661f, 0.18f);
+            Tone(data, (int)(Rate * 0.2f), (int)(Rate * 0.45f), 2093f, 0.2f);
+            return Clip("Gem", data);
+        }
+
+        public void LightsClunk(float volume = 0.5f) { if (chime != null && clunkClip != null) chime.PlayOneShot(clunkClip, volume); }
+        public void ShutterDown() { if (chime != null && shutterClip != null) chime.PlayOneShot(shutterClip, 0.7f); }
+        public void Gem() { if (chime != null && gemClip != null) chime.PlayOneShot(gemClip, 0.6f); }
 
         /// <summary>Lub-dub: two low thumps, the second softer.</summary>
         private static AudioClip Heart()

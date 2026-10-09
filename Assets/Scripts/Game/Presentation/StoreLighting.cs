@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using NightSupermarket.Core;
 using UnityEngine;
@@ -14,9 +16,15 @@ namespace NightSupermarket.Game
         private readonly List<Light> emergency = new List<Light>();
         private readonly List<Light> alwaysOn = new List<Light>();
         private Light dawn;
+        private readonly List<Light> skylights = new List<Light>();
         private ReflectionProbe probe;
         private LightingMode mode = LightingMode.Normal;
         private float probeTimer = -1;
+        private Coroutine sweep;
+        /// <summary>Fired for each bank of fixtures that goes out during a sweep; the root plays the clunk.</summary>
+        public Action<Vector3> BankOff;
+        /// <summary>Seconds between banks going out at closing, and after lights out.</summary>
+        public float ClosingStep = 1.3f, DarkStep = 0.55f;
         private sealed class Fixture
         {
             public Light Light;
@@ -46,12 +54,12 @@ namespace NightSupermarket.Game
                 if (light.type == LightType.Directional) { light.intensity = 0.08f; light.shadows = LightShadows.None; light.color = new Color(0.35f, 0.42f, 0.7f); }
             var probeObject = new GameObject("Store reflections");
             probeObject.transform.SetParent(transform, false);
-            probeObject.transform.position = new Vector3(0, 1.5f, 0);
+            probeObject.transform.position = new Vector3(0, PrimitiveWorld.CeilingY * 0.5f, 0);
             probe = probeObject.AddComponent<ReflectionProbe>();
             probe.mode = ReflectionProbeMode.Realtime;
             probe.refreshMode = ReflectionProbeRefreshMode.ViaScripting;
             probe.timeSlicingMode = ReflectionProbeTimeSlicingMode.AllFacesAtOnce;
-            probe.size = new Vector3(30, 3.2f, 30);
+            probe.size = new Vector3(30, PrimitiveWorld.CeilingY + 0.2f, 30);
             probe.resolution = 64;
             probe.boxProjection = true;
             probe.clearFlags = ReflectionProbeClearFlags.SolidColor;
@@ -87,7 +95,7 @@ namespace NightSupermarket.Game
             lamp.shadows = LightShadows.None;
             lamp.renderMode = LightRenderMode.Auto;
             var tubes = visual != null ? visual.GetComponentsInChildren<Renderer>() : new Renderer[0];
-            fixtures.Add(new Fixture { Light = lamp, Tubes = tubes, Intensity = intensity, Flickers = flickers, Warehouse = warehouse });
+            fixtures.Add(new Fixture { Light = lamp, Tubes = tubes, Intensity = intensity, Flickers = flickers, Warehouse = warehouse, On = true });
         }
         public void AddEmergency(Vector3 position, float range)
         {
@@ -111,6 +119,24 @@ namespace NightSupermarket.Game
             alwaysOn.Add(lamp);
             return lamp;
         }
+        /// <summary>
+        /// A skylight: cool moonlight falling in a cone from the raised ceiling. Off while the store is
+        /// lit; after lights out it is what draws the aisles in silhouette, so the dark is readable
+        /// without being bright. No shadows, so it costs about what a point light does.
+        /// </summary>
+        public void AddSkylight(Vector3 position)
+        {
+            var lamp = new GameObject("Skylight").AddComponent<Light>();
+            lamp.transform.SetParent(transform, false);
+            lamp.transform.position = position;
+            lamp.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            lamp.type = LightType.Spot; lamp.spotAngle = 70f; lamp.innerSpotAngle = 30f; lamp.range = position.y + 2f;
+            lamp.intensity = 0f; lamp.color = new Color(0.55f, 0.68f, 1f);
+            lamp.shadows = LightShadows.None; lamp.renderMode = LightRenderMode.Auto;
+            lamp.enabled = false;
+            skylights.Add(lamp);
+        }
+
         public void AddDawn(Vector3 position, Vector3 target)
         {
             dawn = new GameObject("Dawn light").AddComponent<Light>();
@@ -121,20 +147,26 @@ namespace NightSupermarket.Game
             dawn.color = new Color(1f, 0.72f, 0.45f);
             dawn.shadows = LightShadows.Soft;
         }
+        private bool Wanted(int index, Fixture fixture) => mode switch
+        {
+            LightingMode.Normal => true,
+            LightingMode.Partial => index % 3 == 0 || fixture.Warehouse,
+            LightingMode.Dawn => fixture.Warehouse,
+            _ => false
+        };
+
         public void Apply(LightingMode next)
         {
+            bool darker = next == LightingMode.Partial && mode == LightingMode.Normal || next == LightingMode.Dark && mode == LightingMode.Partial;
             mode = next;
-            for (int i = 0; i < fixtures.Count; i++)
+            if (sweep != null) { StopCoroutine(sweep); sweep = null; }
+            if (darker && isActiveAndEnabled && fixtures.Count > 0) sweep = StartCoroutine(Sweep(next == LightingMode.Partial ? ClosingStep : DarkStep));
+            else
+                for (int i = 0; i < fixtures.Count; i++) SetFixture(fixtures[i], Wanted(i, fixtures[i]) ? 1f : 0f);
+            foreach (var lamp in skylights)
             {
-                var fixture = fixtures[i];
-                bool on = mode switch
-                {
-                    LightingMode.Normal => true,
-                    LightingMode.Partial => i % 3 == 0 || fixture.Warehouse,
-                    LightingMode.Dawn => fixture.Warehouse,
-                    _ => false
-                };
-                SetFixture(fixture, on ? 1f : 0f);
+                lamp.enabled = mode == LightingMode.Dark || mode == LightingMode.Emergency;
+                lamp.intensity = mode == LightingMode.Dark ? 9f : 4f;
             }
             foreach (var lamp in emergency) lamp.enabled = mode == LightingMode.Emergency || mode == LightingMode.Dark;
             foreach (var lamp in emergency) lamp.intensity = mode == LightingMode.Emergency ? 7f : 1.6f;
@@ -158,6 +190,35 @@ namespace NightSupermarket.Game
             RenderSettings.fogDensity = mode == LightingMode.Dark ? 0.018f : mode == LightingMode.Normal ? 0.004f : 0.01f;
             probeTimer = 0.1f;
         }
+        /// <summary>
+        /// Banks go out from the back of the store toward the entrance, one every few seconds, each with
+        /// a clunk: closing time you can hear and see coming. Fixtures that stay on in the new mode are
+        /// skipped, so the sweep is only ever "what goes out", never "what comes on".
+        /// </summary>
+        private IEnumerator Sweep(float step)
+        {
+            var order = new List<int>();
+            for (int i = 0; i < fixtures.Count; i++) if (fixtures[i].On && !Wanted(i, fixtures[i])) order.Add(i);
+            order.Sort((a, b) => fixtures[b].Light.transform.position.z.CompareTo(fixtures[a].Light.transform.position.z));
+            // Fixtures in the same row (same z) go together, so an aisle darkens as a bank.
+            int at = 0;
+            while (at < order.Count)
+            {
+                float z = fixtures[order[at]].Light.transform.position.z;
+                Vector3 where = Vector3.zero; int count = 0;
+                while (at < order.Count && Mathf.Abs(fixtures[order[at]].Light.transform.position.z - z) < 0.5f)
+                {
+                    SetFixture(fixtures[order[at]], 0f);
+                    where += fixtures[order[at]].Light.transform.position; count++;
+                    at++;
+                }
+                BankOff?.Invoke(where / Mathf.Max(1, count));
+                probeTimer = 0.1f;
+                yield return new WaitForSeconds(step);
+            }
+            sweep = null;
+        }
+
         private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
         private MaterialPropertyBlock block;
         private void SetFixture(Fixture fixture, float level)

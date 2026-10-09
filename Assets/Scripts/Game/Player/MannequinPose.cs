@@ -22,6 +22,7 @@ namespace NightSupermarket.Game
         private CarrySystem carry;
         private float tilt;
         private Transform visual;
+        private CharacterVisual character;
         private Quaternion visualRest = Quaternion.identity;
 
         public void Configure(PlayerMotor body, StoreDirectory store)
@@ -61,11 +62,12 @@ namespace NightSupermarket.Game
             tilt = Mathf.Lerp(tilt, target, 1f - Mathf.Exp(-10f * Time.deltaTime));
             if (visual == null)
             {
-                var body = GetComponentInChildren<CharacterVisual>();
-                visual = body != null ? body.transform : null;
+                character = GetComponentInChildren<CharacterVisual>();
+                visual = character != null ? character.transform : null;
                 if (visual != null) visualRest = visual.localRotation;
             }
             if (visual != null) visual.localRotation = visualRest * Quaternion.Euler(0f, 0f, tilt);
+            if (character != null) character.SetStance(Holding ? Strain.Current : Stance.Neutral);
         }
     }
 }

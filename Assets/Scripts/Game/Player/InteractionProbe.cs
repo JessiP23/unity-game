@@ -23,8 +23,9 @@ namespace NightSupermarket.Game
                 var exact = direct.collider.GetComponentInParent<IInteractable>();
                 if (exact != null && InteractionValidation.CanReach(motor, direct.collider.transform)) return exact;
             }
-            // A small aim tolerance helps thin folded shirts without allowing use through walls.
-            int count = Physics.SphereCastNonAlloc(origin, 0.16f, forward, hits, motor.Rules.interactionDistance, mask, QueryTriggerInteraction.Ignore);
+            // A small aim tolerance helps thin folded shirts without allowing use through walls; wider when the camera is not the eyes.
+            float tolerance = view != null && view.Effective != ViewMode.FirstPerson ? 0.32f : 0.16f;
+            int count = Physics.SphereCastNonAlloc(origin, tolerance, forward, hits, motor.Rules.interactionDistance, mask, QueryTriggerInteraction.Ignore);
             IInteractable closest = null; float distance = float.MaxValue;
             for (int i = 0; i < count; i++)
             {
@@ -36,11 +37,28 @@ namespace NightSupermarket.Game
             }
             return closest;
         }
+        /// <summary>
+        /// Where the look-ray starts and points. In first person it is the camera. Over the shoulder or in
+        /// the front (pose) view the camera is metres from the body, so the ray starts at the body's eyes
+        /// and points where the body faces, tilted down a little to catch things on the floor.
+        /// </summary>
+        public void Aim(out Vector3 origin, out Vector3 forward)
+        {
+            if (view.Effective == ViewMode.FirstPerson)
+            {
+                origin = view.View.transform.position; forward = view.View.transform.forward;
+                return;
+            }
+            origin = motor.transform.position + Vector3.up * 1.45f;
+            forward = (motor.transform.forward + Vector3.down * 0.35f).normalized;
+        }
+
         private void Update()
         {
             Prompt = "";
             if (!view.Active || (!motor.Record.Free && !motor.Record.InBackroom)) return;
-            var target = FindTarget(view.View.transform.position, view.View.transform.forward);
+            Aim(out var origin, out var forward);
+            var target = FindTarget(origin, forward);
             if (target == null) return;
             var carry = motor.GetComponent<CarrySystem>();
             bool handsFull = carry != null && carry.Held != null && target is PhysicalItem item && item.Holder == null;

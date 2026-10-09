@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 namespace NightSupermarket.Core
 {
-    public enum ScoreEvent { RequiredJob, OptionalJob, CloseCall, PoseMatch, Comeback, EscapeTime, Report, Capture }
+    public enum ScoreEvent { RequiredJob, OptionalJob, CloseCall, PoseMatch, Comeback, EscapeTime, Report, Capture, Admired, Gem }
 
     /// <summary>One line of the end-of-night card.</summary>
     public readonly struct ScoreLine
@@ -21,7 +21,7 @@ namespace NightSupermarket.Core
     /// </summary>
     public sealed class NightScore
     {
-        public const int RequiredJobPoints = 500, OptionalJobPoints = 300, CloseCallPoints = 100, PoseMatchPoints = 150, ComebackPoints = 200;
+        public const int RequiredJobPoints = 500, OptionalJobPoints = 300, CloseCallPoints = 100, PoseMatchPoints = 150, ComebackPoints = 200, AdmiredPoints = 75, GemPoints = 250;
         public const int ReportPenalty = 150, CapturePenalty = 400, PointsPerSecondLeft = 10;
         /// <summary>Unseen seconds that lift the multiplier to 1.5, then to 2.</summary>
         public const double StreakTierOne = 60, StreakTierTwo = 120;
@@ -52,6 +52,8 @@ namespace NightSupermarket.Core
                 ScoreEvent.CloseCall => CloseCallPoints,
                 ScoreEvent.PoseMatch => PoseMatchPoints,
                 ScoreEvent.Comeback => ComebackPoints,
+                ScoreEvent.Admired => AdmiredPoints,
+                ScoreEvent.Gem => GemPoints,
                 ScoreEvent.Report => -ReportPenalty,
                 ScoreEvent.Capture => -CapturePenalty,
                 _ => 0
@@ -91,6 +93,8 @@ namespace NightSupermarket.Core
             ScoreEvent.CloseCall => "Close call",
             ScoreEvent.PoseMatch => "Perfect pose",
             ScoreEvent.Comeback => "Comeback from the back hall",
+            ScoreEvent.Admired => "A shopper admired you",
+            ScoreEvent.Gem => "Hidden gem",
             ScoreEvent.EscapeTime => "Time left",
             ScoreEvent.Report => "Reported by a shopper",
             ScoreEvent.Capture => "Caught",

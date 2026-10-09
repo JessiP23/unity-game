@@ -52,7 +52,7 @@ namespace NightSupermarket.Game
             public float EchoQuietUntil, NoteUntil, Entered, StartStripSince;
             public int LastPad = -1;
             public string Note;
-            public bool ReplayArmed = true;
+            public bool ReplayArmed = true, GapTried;
         }
 
         public void Configure(LocalMatchAuthority match, bool otherMannequins)
@@ -108,6 +108,7 @@ namespace NightSupermarket.Game
                         Place(motor, hall.Starts[room]);
                         Say(trip, "The light caught you moving. Freeze when it is on you; cross when it passes.");
                     }
+                    else WalkIntoGap(trip, at, room);
                     break;
                 }
                 case BackroomTrial.RedLight:
@@ -119,6 +120,7 @@ namespace NightSupermarket.Game
                         Place(motor, hall.Starts[room]);
                         Say(trip, "The camera was red. Move on green only, and stop before it turns.");
                     }
+                    else WalkIntoGap(trip, at, room);
                     break;
                 }
                 case BackroomTrial.EchoTiles:
@@ -152,6 +154,24 @@ namespace NightSupermarket.Game
                 }
             }
             if (Time.time > trip.NoteUntil) trip.Note = null;
+        }
+
+        /// <summary>Reaching the gap at the far end counts as using it, so a captive who walks up to it is not left pressing nothing.</summary>
+        private void WalkIntoGap(Trip trip, Vector3 at, int room)
+        {
+            Vector3 p = trip.Motor.transform.position;
+            bool atGap = p.z > at.z + 8.3f && Mathf.Abs(p.x - at.x) < 1.0f;
+            if (!atGap) { trip.GapTried = false; return; }
+            if (trip.GapTried) return;
+            trip.GapTried = true;
+            TryUse(trip.Motor, room, -1);
+        }
+
+        /// <summary>True while a failure note is on screen; the HUD shows it over any look-at prompt.</summary>
+        public bool NoteShowing(PlayerMotor motor)
+        {
+            var trip = Find(motor);
+            return trip != null && !string.IsNullOrEmpty(trip.Note);
         }
 
         public string PromptFor(PlayerMotor motor)
