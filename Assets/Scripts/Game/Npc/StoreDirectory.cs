@@ -39,22 +39,38 @@ namespace NightSupermarket.Game
         {
             ZoneVolume best = null;
             foreach (var zone in zones)
-                if (zone.Bounds.Contains(position) && (best == null || zone.Area < best.Area)) best = zone;
+                if (Inside(zone.Bounds, position) && (best == null || zone.Area < best.Area)) best = zone;
             return best != null ? best.zone : (ZoneType?)null;
         }
 
+        /// <summary>
+        /// Footprint containment plus height. Bodies stand on the floor and agents can sit a hair below it,
+        /// so the floor of a zone is extended half a metre down; floors are 3.3 m apart, so this never
+        /// confuses upstairs with downstairs.
+        /// </summary>
+        private static bool Inside(Bounds bounds, Vector3 position) =>
+            position.x >= bounds.min.x && position.x <= bounds.max.x && position.z >= bounds.min.z && position.z <= bounds.max.z
+            && position.y >= bounds.min.y - 0.5f && position.y <= bounds.max.y;
+
         /// <summary>Random free point of a kind, optionally in a zone, that the given access allows.</summary>
-        public NavigationPoint Pick(PointKind kind, ZoneType? zone, ZoneAccess access, Random random, int npc, NavigationPoint exclude = null)
+        public NavigationPoint Pick(PointKind kind, ZoneType? zone, ZoneAccess access, Random random, int npc, NavigationPoint exclude = null, int group = -1)
         {
             bool shared = kind == PointKind.Entrance || kind == PointKind.Exit || kind == PointKind.Spawn;
             scratch.Clear();
             foreach (var point in points)
-                if (point != exclude && point.kind == kind && (zone == null || point.zone == zone) && access.Allows(point.zone) && (shared || point.Free || point.Occupant == npc))
+                if (point != exclude && point.kind == kind && (zone == null || point.zone == zone) && (group < 0 || point.group == group) && access.Allows(point.zone) && (shared || point.Free || point.Occupant == npc))
                     scratch.Add(point);
             if (scratch.Count == 0) return null;
             var chosen = scratch[random.Next(scratch.Count)];
             if (!shared) chosen.TryReserve(npc);
             return chosen;
+        }
+
+        /// <summary>Takes a point out of the store (linger spots move when a job's target moves).</summary>
+        public void Remove(NavigationPoint point)
+        {
+            if (point == null || !points.Remove(point)) return;
+            Destroy(point.gameObject);
         }
 
         public void ReleaseAll(int npc) { foreach (var point in points) point.Release(npc); }

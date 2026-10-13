@@ -51,7 +51,19 @@ namespace NightSupermarket.Game
         public string StreakLabel;
 
         // Wardrobe and gems (Night page)
-        public string WardrobeText, GemText;
+        public string WardrobeText, GemText, DareText;
+        /// <summary>Tonight's crowd level and the next flash sale (Night page).</summary>
+        public string CrowdText;
+        /// <summary>A live mall event under the clock, e.g. a flash sale countdown. Empty when nothing is on.</summary>
+        public string EventText;
+        public bool EventHot;
+        /// <summary>The next job's crowd and when it goes quiet, under the NEXT chip.</summary>
+        public string JobCrowdText, JobCrowdTint;
+        /// <summary>"IN THE CROWD" badge while shoppers hide you; otherwise a hint about why they don't.</summary>
+        public string CoverText;
+        public bool CoverOn;
+        /// <summary>Map heat per department (map zone name, heat level 0–3, trend -1/0/+1, people).</summary>
+        public readonly List<(string zone, int level, int trend, int people)> Heat = new List<(string, int, int, int)>();
 
         // Pose
         public bool Posing, PoseMatches;
@@ -80,7 +92,7 @@ namespace NightSupermarket.Game
 
         public void ClearLists()
         {
-            Missions.Clear(); Items.Clear(); ReportLines.Clear(); Controls.Clear(); Testing.Clear(); Marks.Clear(); ScoreLines.Clear(); BoardLines.Clear();
+            Missions.Clear(); Items.Clear(); ReportLines.Clear(); Controls.Clear(); Testing.Clear(); Marks.Clear(); ScoreLines.Clear(); BoardLines.Clear(); Heat.Clear();
         }
     }
 }

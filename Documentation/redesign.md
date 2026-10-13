@@ -167,6 +167,236 @@ Now a night leaves something behind you can see and use the next night.
   to the fire exit, the ramp's height halfway up, gems on walkable floor and not inside fixtures, dark
   before lights out and lit after, the shutter down and the front door blocked after lockdown.
 
+## Ninth pass — a crowd you can read, hide in and plan around
+
+Built from the plan agreed after the eighth pass: more people must make every job harder **and** give the
+player new ways to win. Three updates, end to end.
+
+### Update 1 — hide in the crowd, pressure on the jobs, see it coming
+
+- **Hide in the crowd** (`CoverRules`, `CrowdCover`). Walk with two or more shoppers going your way (within
+  2 m, heading within 55°) and watchers' suspicion is cut by 55% (two) or 75% (three or more); the guard
+  doubts what he saw, like a fitting display stand. Running, walking against the flow or alone: no cover.
+  Alongside a group you **fall into step** (`PlayerMotor.PaceCap`: their pace + 0.3 m/s), so you stay in it
+  for a good while and drift out ahead; sprint to break away. A soft cyan ring at your feet and an
+  "IN THE CROWD · 3 shoppers hide you" badge show it working; near people but not with them, the badge
+  says why ("walk their way, at their pace", "running gives you away").
+- **People gather at your jobs** (`JobPressure`, `CrowdDirector.Life`). Two to four shoppers (more with
+  level and Rush hour, fewer on Relaxed) hang around each unfinished job on linger spots 1.6–3 m out,
+  facing it, never on it, checked against the NavMesh, furniture, props and drop rugs. The crowd stays put;
+  it only follows a moved target after 20 s.
+- **A guaranteed quiet moment.** Every job breathes on its own seeded 60–90 s rhythm: busy, a 6 s
+  "quiet in 6s — get ready" warning, then 15 s when everyone drifts off. The map marks the job green.
+- **See it before it happens.** Under the NEXT chip: "CROWD HERE: BUSY (5) · quiet in 0:20", gold when it
+  is about to go quiet, green "QUIET NOW · 12s — go!". On the map every department is tinted by its crowd
+  (Quiet / Steady / Busy / Packed) with an arrow when it is filling up or emptying.
+
+### Update 2 — who is in the crowd
+
+Each kind reads at a glance (`ShopperKind`, `ShopperLook`, new `Stance` poses):
+
+- **Families** (40% of groups arriving together): a grown-up and kids at 70% size who stay at their side.
+  Kids see everything (200° view) but take two seconds to tug the grown-up, who turns to look: freeze and
+  it fizzles. The crowd half-hides you from kids.
+- **Phone zombies** (18% of arrivals): head bowed over a glowing phone, 40° view and 3.5 m. Safe to pass,
+  and good cover.
+- **The influencer** (one at a time, from 45 s, never on Relaxed): phone held out, ring light, REC dot and
+  a red camera light sweeping the floor — the mall cameras' "don't move in the red light" rule again.
+  The camera sees through any crowd and reports at once; you **go viral** (a toast with the clip's caption
+  and a photo). Marked "REC" on the map.
+- **Cleaners and restockers** (a cleaner always, a restocker from level 3 or on Rush hour): staff with a mop
+  or a box who walk to tonight's job spots and work there ~20 s. Cleaners leave a **wet floor** with a
+  yellow sign: walk across and nothing happens, run across and it squeaks loud enough for the guard.
+
+### Update 3 — clock in, and make sure it is fair
+
+- **Shift card** (`ShiftCard`, `DifficultyRules`): before the night, pick Relaxed (×0.7 crowd, no
+  influencer, one fewer at each job, score ×0.8), Normal, or Rush hour (×1.3 crowd, three 40 s flash sales,
+  one more at each job, score ×1.3; unlocks after three nights). Keys 1/2/3 or click, Enter to clock in;
+  last night's choice is preselected. The automatic "busier every night" level stacks on top. The end card
+  shows the shift, the crowd level, how long you hid in the crowd and how often you went viral.
+- **Night metrics** (`CrowdMetrics`): every real night appends a row to `crowd-metrics.csv` in the game's
+  saved-data folder (Unity's persistentDataPath): difficulty, level, jobs done, reports and reports per
+  minute, influencer clips, peak crowd, mean budget and frame time, seconds hidden in the crowd, and seconds
+  spent near each unfinished job. Tuning targets: Normal at level 0 — about 7 nights in 10 end with every
+  job done; Rush hour at level 8 — still beatable; reports per minute under 1 on Normal.
+
+Scripted tests run with crowd pressure, new kinds and sales off unless a test turns them on; hiding in the
+crowd is always on (it only ever helps). Known gap: co-op clients see new kinds as ordinary shoppers (the
+snapshot carries no kind yet) and only the host picks the shift.
+
+Tests: EditMode `CrowdLifeTests` (cover geometry and strength, concealment in awareness, lingerer counts,
+quiet windows within every 90 s on 40 shifts, heat, difficulty factors, rush sales never overlapping, score
+factor, metrics row, lingering shoppers). PlayMode `MallCrowdLifeTests` (walking with three shoppers covers
+you and slows you into step, sprinting breaks it; shoppers gather at a job and leave in its quiet window;
+heat map counts; family, phone zombie, influencer and cleaner are dressed and behave; wet floor squeaks only
+when running; shifts change crowd and sales). `Tools/unity.py shots` adds `crowd_cast.png`,
+`crowd_influencer.png` and `shift_card.png`.
+
+Next, as asked: crouching, and hiding spots to crouch into.
+
+## Eighth pass — a busier mall that makes every job harder
+
+Playtest feedback: more people, so each mission is harder to cover. Done so the crowd is something to
+read and plan around, not just noise, and so it stays smooth on a laptop.
+
+- **More shoppers, growing with you** (`CrowdPlan`, `NpcPopulation.asset`). The mall now breathes between
+  10 and 20 shoppers on a first night (was 6–12), with 12 already inside at opening and a third member of
+  staff. Each night you play adds 10% (`CrowdPlan.Level`, from `ns-nights`), up to +80% at level 8
+  ("Steady", "Busy", "Bustling", "Packed", "Heaving" — shown on the start toast and the Night page). Closing
+  time still halves the crowd and lights out still empties it, so the night keeps its shape.
+- **People arrive like people** — in ones, couples and little groups through the mall doors, faster when
+  the mall is far below where it should be (`CrowdPlan.Arrivals`, `ArrivalGap`).
+- **Flash sales** (`CrowdDirector`, `CrowdPull`). Twice a night (once while the store is open, once at
+  closing time; same times for everyone on a shift) the PA chimes: "FLASH SALE in Toys in 10 seconds".
+  For 50 s that department is mobbed — 30% more people come in, nearly half of those already shopping drop
+  what they are doing, and 70% of the rest make a detour — and everywhere else goes quiet. Sales are called
+  in the departments **tonight's jobs are in**, so the crowd lands on your objective: get it done before,
+  wait it out, or use the empty mall elsewhere. A spinning orange sign hangs over the sale, the map marks
+  it, and the top of the screen counts it down. Shoppers stand on extra sale spots placed round the
+  department's shelves (checked against the NavMesh, furniture, job props and drop rugs once the store has
+  settled), and come away carrying a bargain.
+- **Smooth on any machine.** A live budget (`CrowdBudget`) watches the frame time: below ~48 fps it stops
+  people coming in (never cutting far below who is already there, and pausing to see if that helped), and
+  if the mall is well over budget one distant shopper goes home; above ~56 fps it earns room back, up to 40
+  shoppers. One-off hitches are ignored. Crowd level of detail: only shoppers within ~13 m cast shadows,
+  further ones skin with two bones and cheaper avoidance, and nobody off screen is animated or skinned.
+- Tests: EditMode `CrowdTests` (levels, budget, sale timing, group arrivals, shoppers' sale detours);
+  PlayMode `MallCrowdTests` (opening crowd and budget cap, sale spots on open floor on four shifts, a sale is
+  announced, floods its department and ends, two sales use different departments). Scripted scenario tests
+  run without sales; the walkthrough test clears the crowd first, and the shutter test looks past shoppers
+  walking out. The Core test build now compiles only against the Unity modules `Packages/manifest.json`
+  enables, so a disabled built-in module fails here exactly as in the editor.
+
+## Seventh pass — real fountain and carousel, Clothing that answers E, flush screens, funny moments
+
+From the playtest: the fountain and the carousel were "basic squares", E in Clothing did nothing, and
+TV/monitor screens floated off their sets. Plus: make it unique, funny and worth coming back to.
+
+- **Clothing answers E** (`FittingRack`). Every rack and table lends you clothes: E puts on a borrowed
+  piece (disguise in Clothing and the toy store while you stand still), E again puts it back, capture
+  loses it. The model stand accepts borrowed clothes too. The old hint that always said "E on a blue
+  shirt" now only appears on nights that have the shirt job. Racks and the fountain rim are
+  `ILowPriorityInteractable`: when you aim near something small on them (the job shirt, a gem), the
+  small thing wins.
+- **Everything usable says so.** A glowing **E** badge floats over whatever the probe would use
+  (`InteractBadge`, fed by `InteractionProbe.Target`).
+- **The fountain** (`FountainDressing`, `FountainWish`). Marble basin and coping, a tiered
+  centrepiece spun from profiles (`MeshKit.Lathe`), moving water (generated ripple normals scrolled on
+  `_BaseMap_ST`, which URP Lit uses for every map), a jet and two curtains of spray (~200 particles),
+  coins on the bottom, three rubber ducks drifting round, the sound of water. **E on the rim tosses a
+  coin, once a night**: the splash is a noise the guard comes to check, and the fountain grants the
+  shift's wish (`FountainWish`: +150 points, a gem, or 45 s in which no shopper will report you).
+  Wading in and moving splashes too.
+- **The carousel** (`CarouselRide`). Poly Haven horse statues on brass poles (rounded primitive horses
+  without the art), a striped tent canopy with valance and brass trim, a mirrored centre column, a
+  wooden deck, 24 chasing bulbs.
+- **Screens sit on their sets** (`DressingKit.FitScreen`). The glow is fitted from the model's own
+  triangles: the depth with the most forward-facing area is the screen face, the panel covers its middle
+  and sits 3 mm in front. Used for the TV wall and the security monitors. A test fires a ray at the
+  middle of a fitted panel and requires the glass within 1.5 cm behind it.
+- **Funny on purpose.** Caught mannequins **keel over stiff as a plank** with a thud and the camera
+  swings round to show it (`CharacterVisual.Topple`, `PrototypeRoot.Plank`, presentation only: tests
+  still enter the hall at once). The **photo booth** (`PhotoBooth`) saves the night's moments to
+  Pictures/Night Mall — a shopper's selfie with you, the plank, the escape — and slides a polaroid in.
+- **A reason to come back tomorrow.** One **nightly dare** per shift (`NightDare`: Photobomb,
+  Merry-go-round, Make a wish, Nobody saw a thing, Treasure hunter, Slow and steady, Fire drill) worth
+  300 points and a gem, shown on the start toast, the Night page and the end card. Completing the daily
+  shift's dare on consecutive days builds a **dare streak**; missing a day just starts again at one —
+  nothing is taken away (no fear-of-missing-out timers, no loot boxes).
+
+New art (run `python3 Tools/fetch_art.py` once): `horse_statue_01`, `potted_plant_01`,
+`potted_plant_02`, `rubber_duck_toy`, surface `marble_01`. Everything falls back when missing.
+
+Tests: EditMode `DareTests`; PlayMode `MallPolishTests` (racks lend clothes and the probe offers them,
+one coin a night and the splash is heard, fitted screens sit on the glass, the dare and the photo booth
+exist and test runs never write photos). `Tools/unity.py shots` now also photographs the atrium,
+fountain, toy store, carousel, robot shelf, escalator, upstairs, TV wall and security monitors.
+
+## Sixth pass — the mall: a real escalator and its rival stairs, the atrium, the toy store, the carousel
+
+"Bigger" here means more decisions per minute, not more square metres. Everything new is a place
+with its own rule of cover, and every new system reuses noise, reports and poses the game already had.
+
+- **The climb has two answers** (`PrimitiveWorld.BuildMezzanine`, `MovingSurface`). The escalator is
+  now a belt (`EscalatorBelt` on the ramp): treads travel up it (`EscalatorTreads`), glass
+  balustrades, a handrail and an under-light strip dress it, and it **carries you** — and because a
+  mannequin riding up is a mannequin that moves, the carry counts as movement for every watcher. Beside
+  it, through a stairwell cut out of the slab, a **staircase** (x 1.1..2.7, twenty steps) is slower but
+  you can stop on any step. The sign at the foot says exactly that. `PlayerMotor` samples the floor
+  under the feet each step and asks any `MovingSurface` how far to carry the body; the surface decides
+  whether that counts (`CountsAsMovement`).
+- **The mall** (`PrimitiveWorld.BuildMall`, `MallDressing`). The supermarket's front doors now stand
+  open onto an **atrium** (x -12..12, z -33..-15): an 8 m glass roof with moonlight through it, a
+  fountain with a rim to crouch behind, planters, benches (the Lounging pose belongs here), and two
+  **security cameras** that sweep a red pool of light across the floor. Shoppers arrive and leave
+  through the mall doors at the far end, so the atrium is always crossed by people. The **toy store**
+  opens off its west side (x -30..-12, z -33..-18): stocked shelves that **rattle** if you run past
+  them (`NoisyShelf`, a noise the guard hears), a tall shelf with a robot on the top and a step stool
+  in front of it, and the **carousel**. The escape door is now beside the mall doors: the jobs are in
+  the supermarket, the way out is across the atrium.
+- **The carousel** (`CarouselRide`). A turning platform with six bobbing horses under a lit canopy,
+  a synthesised waltz that slows when it does, bulbs that chase while it runs. It runs 28 s, rests
+  10 s, repeats. Riders are carried, and because a carousel is supposed to turn, **being carried does
+  not count as moving**: a mannequin posed on a horse is the most natural thing in the store. When it
+  stops you are a mannequin standing on a ride, and the usual rules apply. The platform is under the
+  controller's step height so you walk straight on. One rotating transform.
+- **Security cameras** (`SecurityCamera`). The rule is one line and the light is the whole interface:
+  *don't move in the red light*. Stand still inside it and nothing happens; move for more than 0.45 s
+  and the camera reports you like a shopper would (`authority.TryReport`, same consequences), its LED
+  turns amber and the pool flashes. A one-time toast explains it the first time the light touches you.
+  Twelve-second cooldown per body so one slip is one report. Reports read "A security camera reported
+  movement near the atrium".
+- **Two new jobs** (`JobCatalog`): *Ride the carousel for one full turn* (a `HoldSpot` on the spinner;
+  it starts by itself when you hold the Display pose while the ride turns, pauses when it stops —
+  `HoldSpot.Gate` — and keeps half its progress if you move), and *Take the robot from the top shelf*
+  (climb the stool, E; the robot is kinematic so it stays put on the shelf edge). Shoppers now also
+  shop the toy store and the gallery (`ShoppingCatalog.Default`).
+- **Lockdown, revised.** The shutter drops over the **supermarket's own doors** (with a NavMesh obstacle
+  so shoppers turn back). Inside, the fire exit upstairs is the way out; already out in the mall, the
+  front doors still are. The guide marker picks by which side of the doors you are on.
+- **Four more gem spots** in the mall: a planter edge, the fountain rim, the carousel pole (pose-gated,
+  Display, the platform turning under you), the floor between the west toy shelves.
+- **Map**: covers the whole mall now (x -30..15, z -33..15); zone labels scale down.
+
+### Tuning knobs
+
+| What | Where | Default |
+| --- | --- | --- |
+| Escalator belt speed | `EscalatorBelt.Speed` | 0.55 m/s |
+| Carousel run / rest / speed | `CarouselRide.RunSeconds / RestSeconds / TopSpeed` | 28 s / 10 s / 12°/s |
+| Camera cone, range, sweep, grace, cooldown | `SecurityCamera` constants | 44°, 15 m, ±38° over 7 s, 0.45 s, 12 s |
+| Toy shelf rattle loudness | `NoisyShelf.Loudness` | 1.1 |
+| Ride job length | `JobBuilder.BuildCarouselJob` | run − 3 s |
+
+### Tests
+
+- PlayMode `MallTests`: complete NavMesh routes from the mall doors to the aisles, the carousel, the
+  robot stool, the escape door and upstairs; the new zones; the stairs climb without gaps and end at
+  the mezzanine; the carousel carries a rider without its `ActualSpeed` reaching the movement
+  threshold; mall gem spots on open floor. `MezzanineTests` now checks the shutter closes the
+  supermarket doors and leaves the mall's escape door open.
+
+### Fixes from the first full PlayMode run (2026-10-11: 52 passed, 14 failed)
+
+- Upstairs was unreachable: the gallery TV wall plus the top ends of the escalator side panels and
+  the stair rail pinched the landing shut on the NavMesh. The TV wall now starts at x 3.8, the
+  panels and rail stop 0.4 m short of the top, and the fire exit moved to x 12.
+- Shoppers left without shopping: the toy store and gallery were on every shopping list, including
+  test stores that have neither, and the height-aware zone check rejected bodies a hair below the
+  floor. `ShoppingCatalog.Default` is the classic four again; real nights use `ShoppingCatalog.Mall`
+  (`CustomerPopulationManager.Catalog`); `StoreDirectory.ZoneAt` allows 0.5 m below a zone's floor.
+- The robot marker snapped to the toy-store roof. It now stands in front of the stool, and roofs,
+  benches, planters, the fountain and the robot shelf are marked not-walkable (`PrimitiveWorld.NotFloor`).
+- Tests updated for the new layout: the escape door is found by name (there are two exits now), the
+  back-hall test no longer assumes room 1 has a button, the hold-spot test uses open aisle floor, and
+  the carousel gem is exempt from the walkable-floor check (you reach it by riding).
+
+### Known gaps
+
+- The carousel angle is local time; for online co-op it must be driven from the authority's clock.
+- The food court (east of the atrium) is the next space; the wall at x 12 is where it goes.
+
 ## Fixes after the first playtest (2026-10-08)
 
 - **Shirts were on the floor, not the table.** `JobBuilder.SnapLooseItemsToFloor` judged "inside

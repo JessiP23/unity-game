@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 namespace NightSupermarket.Game
 {
-    public enum PointKind { Browse, Checkout, Entrance, Spawn, Exit, Work }
+    public enum PointKind { Browse, Checkout, Entrance, Spawn, Exit, Work, Sale, Linger }
 
     /// <summary>NavMesh area used to keep civilians out of staff-only zones.</summary>
     public static class NavigationAreas
@@ -18,6 +18,8 @@ namespace NightSupermarket.Game
     {
         public ZoneType zone;
         public PointKind kind;
+        /// <summary>Which of tonight's jobs a linger spot belongs to; -1 for every other point.</summary>
+        public int group = -1;
         /// <summary>Id of the NPC currently using the point, or 0.</summary>
         public int Occupant { get; private set; }
         public bool Free => Occupant == 0;

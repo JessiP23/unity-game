@@ -20,10 +20,18 @@ namespace NightSupermarket.Game
         { directory = store; access = zones; random = rng; owner = npc; }
 
         /// <summary>Picks a point for the destination; <paramref name="avoid"/> is skipped when alternatives exist.</summary>
-        public NavigationPoint Choose(DestinationKind kind, ZoneType? zone, NavigationPoint avoid = null)
+        public NavigationPoint Choose(DestinationKind kind, ZoneType? zone, NavigationPoint avoid = null, bool sale = false, int linger = -1)
         {
             Release();
             if (directory == null) return null;
+            // Hanging around a job: only that job's spots will do.
+            if (linger >= 0 && kind == DestinationKind.Department) return Target = directory.Pick(PointKind.Linger, zone, access, random, owner, avoid, linger);
+            // A flash sale fills the floor round the sale bins first, then the zone's ordinary shelves.
+            if (sale && kind == DestinationKind.Department && zone.HasValue)
+            {
+                Target = directory.Pick(PointKind.Sale, zone, access, random, owner, avoid);
+                if (Target != null) return Target;
+            }
             Target = kind switch
             {
                 DestinationKind.Entrance => directory.Pick(PointKind.Entrance, null, access, random, owner, avoid),
@@ -34,6 +42,9 @@ namespace NightSupermarket.Game
             };
             return Target;
         }
+
+        /// <summary>A free spot round one of tonight's jobs (staff errands use any zone their access allows).</summary>
+        public NavigationPoint ChooseLinger(int job) { Release(); return Target = directory != null ? directory.Pick(PointKind.Linger, null, access, random, owner, null, job) : null; }
 
         public NavigationPoint ChooseWork() { Release(); return Target = directory != null ? directory.Pick(PointKind.Work, null, access, random, owner) : null; }
 

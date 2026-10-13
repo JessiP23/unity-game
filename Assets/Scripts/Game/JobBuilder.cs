@@ -42,7 +42,12 @@ namespace NightSupermarket.Game
         private bool cratesBuilt;
         private readonly List<PhysicalItem> crates = new List<PhysicalItem>();
         private readonly List<HoldSpot> tags = new List<HoldSpot>();
-        private HoldSpot window, swap, cameraPole;
+        private HoldSpot window, swap, cameraPole, ride;
+        private CarouselRide carousel;
+        private PhysicalItem robot;
+        public CarouselRide Carousel => carousel;
+        /// <summary>The carousel job's hold, configured only on nights that draw it.</summary>
+        public HoldSpot RideSpot => ride;
         private Transform swapMarker;
         private int swapIndex;
         private CrossZone lane;
@@ -87,6 +92,8 @@ namespace NightSupermarket.Game
             BuildModelStand();
             if (!solo) BuildRescue();
             BuildExit();
+            carousel = CarouselRide.Create(root, PrimitiveWorld.CarouselCentre);
+            carousel.Ride.enabled = false;
             BuildGems();
             foreach (var job in Jobs)
                 switch (job.Id)
@@ -97,6 +104,8 @@ namespace NightSupermarket.Game
                     case "price-tags": BuildPriceTags(); break;
                     case "camera-blind": BuildCamera(); break;
                     case "lost-toy": BuildLostToy(); break;
+                    case "carousel-ride": BuildCarouselJob(); break;
+                    case "top-shelf-robot": BuildRobot(); break;
                     case "fragile-vase": BuildVases(); break;
                 }
         }
@@ -240,12 +249,13 @@ namespace NightSupermarket.Game
 
         private void BuildExit()
         {
-            var exit = PrimitiveWorld.Box(root, "Escape door", new Vector3(5, 1.3f, -14.6f), new Vector3(1.4f, 2.4f, 0.3f), new Color(0.8f, 0.2f, 0.7f));
+            // The escape door is in the mall's front wall, beside the mall doors: jobs are in the supermarket,
+            // the way out is across the atrium. At lockdown the shutter closes the supermarket's own doors.
+            var exit = PrimitiveWorld.Box(root, "Escape door", PrimitiveWorld.EscapeDoor, new Vector3(1.4f, 2.4f, 0.3f), new Color(0.8f, 0.2f, 0.7f));
             var front = exit.AddComponent<EscapeInteractable>();
             front.Configure(authority, "");
-            front.BlockedPrompt = "Shutter down. The FIRE EXIT is upstairs — take the escalator.";
             Escape = exit.transform;
-            Shutter = FrontShutter.Create(root, front, new Vector3(5f, 0f, -14.3f));
+            Shutter = FrontShutter.Create(root, null, new Vector3(0f, 0f, -14.85f), 3.9f);
             // The fire exit door is store geometry (PrimitiveWorld.FireExit); it only needs the interaction.
             var fire = GameObject.Find("Fire exit");
             if (fire != null)
@@ -256,7 +266,38 @@ namespace NightSupermarket.Game
             }
             if (!ObjectiveDressing.Dress(exit, "rollershutter_door", 2.4f, 0f, new Color(0.2f, 0.42f, 0.3f)))
                 ObjectiveDressing.Recolor(exit, new Color(0.2f, 0.42f, 0.3f), 0.5f);
-            ObjectiveDressing.Sign(root, "EXIT", new Vector3(5f, 2.72f, -14.3f), 0f, new Color(0.1f, 0.5f, 0.25f), Color.white, 1.4f, 0.16f);
+            ObjectiveDressing.Sign(root, "EXIT", PrimitiveWorld.EscapeDoor + new Vector3(0f, 1.42f, 0.62f), 0f, new Color(0.1f, 0.5f, 0.25f), Color.white, 1.4f, 0.16f);
+        }
+
+        private void BuildCarouselJob()
+        {
+            ride = carousel.Ride;
+            ride.enabled = true;
+            ride.Configure(authority, signals, ActionKind.Place, "carousel", "carousel");
+            ride.Label = "Riding"; ride.Seconds = carousel.RunSeconds - 3f; ride.KeepOnCancel = 0.5f; ride.AutoStart = true;
+            ride.CanStart = player => HeldPose(player) == Stance.Display && carousel.Speed > carousel.TopSpeed * 0.5f;
+            ride.Gate = () => carousel.Speed > carousel.TopSpeed * 0.5f;
+            ride.GateHint = "The ride has stopped. Hold the pose — you are a mannequin on a carousel now";
+            ride.StartHint = "Step on while it turns and hold the Display pose (right mouse)";
+            ride.BlockedHint = "Hold the Display pose while it turns (right mouse, scroll to pick Display)";
+            ride.DoneHint = "One full turn — ride done";
+            ride.MovedHint = "You moved on the ride — half the turn is lost";
+            ObjectiveDressing.Sign(root, "CAROUSEL · RIDE ONE TURN IN THE DISPLAY POSE", PrimitiveWorld.CarouselCentre + new Vector3(0f, 3.75f, -3.9f), 0f, new Color(0.55f, 0.15f, 0.15f), Color.white, 0.6f, 0.11f);
+        }
+
+        private void BuildRobot()
+        {
+            var data = ScriptableObject.CreateInstance<ItemDefinition>(); data.id = "robot";
+            data.displayName = "Toy robot"; data.missionTag = "robot"; data.inventoryOnly = true; data.slotCost = 1;
+            // On the front edge of the top shelf, so the ray from the step stool clears the shelf face.
+            Vector3 at = PrimitiveWorld.RobotShelf + new Vector3(0f, 3.14f, 0.52f);
+            var box = PrimitiveWorld.Box(root, "Toy robot", at, new Vector3(0.26f, 0.28f, 0.3f), new Color(0.8f, 0.82f, 0.85f));
+            box.layer = 3;
+            robot = box.AddComponent<PhysicalItem>(); robot.Configure(data, signals);
+            robot.Body.isKinematic = true; // it sits on a shelf edge: no physics until it is in a pocket
+            if (!ObjectiveDressing.Dress(box, "gaming_console", 0.26f, 180f, new Color(0.8f, 0.82f, 0.85f)))
+                ObjectiveDressing.Recolor(box, new Color(0.8f, 0.82f, 0.85f), 0.7f);
+            ObjectiveDressing.Sign(root, "ROBOT · TOP SHELF · E FROM THE STOOL", PrimitiveWorld.RobotShelf + new Vector3(0f, 3.6f, 0.2f), 0f, new Color(0.15f, 0.3f, 0.55f), Color.white, 0.5f, 0.08f);
         }
 
         // ---------------- gems ----------------
@@ -272,12 +313,16 @@ namespace NightSupermarket.Game
             (new Vector3(-14.2f, 0.3f, 3.4f), Stance.Neutral),       // 5 past the bakery shelf
             (new Vector3(10.0f, 0.3f, -7.4f), Stance.Neutral),       // 6 between Home and the checkouts
             (new Vector3(4.2f, 0.3f, 13.75f), Stance.Browsing),      // 7 under the TV ledge in Electronics
-            (new Vector3(2.2f, PrimitiveWorld.UpstairsY + 0.25f, 13.8f), Stance.Neutral),   // 8 upstairs, under the gallery TV ledge
+            (new Vector3(4.4f, PrimitiveWorld.UpstairsY + 0.25f, 13.75f), Stance.Neutral),  // 8 upstairs, under the gallery TV ledge
             (new Vector3(14.45f, PrimitiveWorld.UpstairsY + 0.25f, 8.0f), Stance.Neutral),  // 9 upstairs, by the east wall past the sofa
             (new Vector3(10.4f, PrimitiveWorld.UpstairsY + 0.3f, 9.4f), Stance.Lounging),   // 10 upstairs, on the lounge rug
             (new Vector3(-0.6f, PrimitiveWorld.UpstairsY + 0.25f, 14.6f), Stance.Neutral),  // 11 upstairs, landing corner
+            (new Vector3(-8.75f, 0.95f, -17.5f), Stance.Neutral),                            // 12 atrium, on the edge of the north-west planter
+            (new Vector3(-2.35f, 0.74f, -24f), Stance.Neutral),                              // 13 atrium, on the fountain rim
+            (PrimitiveWorld.CarouselCentre + new Vector3(0.9f, 0.5f, 0f), Stance.Display),   // 14 toy store, by the carousel's mirrored column (it turns under you)
+            (new Vector3(-28.7f, 0.25f, -25.5f), Stance.Neutral),                            // 15 toy store, on the floor between the two west shelves
         };
-        public static readonly int[] GatedSpots = { 2, 3, 7, 10 };
+        public static readonly int[] GatedSpots = { 2, 3, 7, 10, 14 };
 
         private void BuildGems()
         {
@@ -314,7 +359,8 @@ namespace NightSupermarket.Game
         {
             var shirtData = ScriptableObject.CreateInstance<ItemDefinition>(); shirtData.id = "shirt";
             shirtData.displayName = "Shirt"; shirtData.missionTag = "shirt"; shirtData.inventoryOnly = true; shirtData.slotCost = 1;
-            Vector3[] shirtPool = { new Vector3(-6.2f, 0.94f, 9.0f), new Vector3(-2.4f, 0.94f, 9.0f), new Vector3(-6.7f, 0.94f, 9.0f), new Vector3(-1.9f, 0.94f, 9.0f) };
+            // On the aisle-side edge of the two Clothing tables (z 8.6..9.4), where you walk up to them.
+            Vector3[] shirtPool = { new Vector3(-6.2f, 0.94f, 8.8f), new Vector3(-2.4f, 0.94f, 8.8f), new Vector3(-6.6f, 0.94f, 8.8f), new Vector3(-2.0f, 0.94f, 8.8f) };
             var used = new List<int>();
             for (int i = 0; i < 2; i++)
             {
@@ -517,6 +563,12 @@ namespace NightSupermarket.Game
                     if (inventory != null && inventory.Items.Count("toy") > 0) { at = lostFound.transform.position; label = "LOST & FOUND"; return true; }
                     if (toy != null && toy.gameObject.activeInHierarchy) { at = toy.transform.position; label = "TOY"; return true; }
                     return false;
+                case "carousel-ride":
+                    at = PrimitiveWorld.CarouselCentre + Vector3.up * 0.3f; label = "CAROUSEL"; return true;
+                case "top-shelf-robot":
+                    if (held != null || robot == null || !robot.gameObject.activeInHierarchy) return false;
+                    // The robot is 3 m up; the marker stands on the floor in front of the stool you climb.
+                    at = PrimitiveWorld.RobotShelf + new Vector3(0f, 0.3f, 1.6f); label = "ROBOT · STOOL"; return true;
                 case "fragile-vase":
                     if (held != null && held.Definition.missionTag == "vase") { at = HomeRug.position; label = "HOME RUG"; return true; }
                     if (held != null) return false;

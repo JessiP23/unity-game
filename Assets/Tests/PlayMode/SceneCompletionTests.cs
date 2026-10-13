@@ -96,6 +96,9 @@ namespace NightSupermarket.Tests
             Assert.That(thief.GetComponent<PlayerInventory>().Items.Count("shirt"), Is.EqualTo(1));
             Assert.That(Mission(root, "steal-shirt").Complete, Is.True, "Steal a shirt from Clothing");
 
+            // The crates are scripted drops onto the rug; a busy mall's shoppers standing round it would knock them off.
+            root.Population.Budget = 0;
+            foreach (var npc in new List<NpcController>(root.Population.Active)) npc.Depart();
             var zone = GameObject.Find("Clothing placement zone").transform.position;
             var crates = new List<PhysicalItem>();
             foreach (var item in Object.FindObjectsByType<PhysicalItem>(FindObjectsSortMode.None))
@@ -164,10 +167,13 @@ namespace NightSupermarket.Tests
         {
             yield return Load();
             var root = Root;
+            // One customer, one mannequin: clear the busy mall (shoppers and staff) so nobody else's report gets in the way.
+            root.Population.Budget = 0;
+            foreach (var npc in new List<NpcController>(root.Population.Active)) npc.Depart();
             var player = root.MannequinAt(0);
             var input = root.InputAt(0);
             var profile = Arena.Watcher();
-            var display = new Vector3(-1.2f, 0, 13.2f);
+            var display = new Vector3(-2.2f, 0, 12.9f); // the Clothing browse spot facing the display mannequins (StoreLayout)
             var held = new List<NavigationPoint>();
             foreach (var point in root.Directory.Points)
             {
@@ -175,7 +181,7 @@ namespace NightSupermarket.Tests
                 if (Vector3.Distance(Flat(point.Position), display) <= 0.5f) point.Release(point.Occupant);
                 else if (point.TryReserve(-99)) held.Add(point);
             }
-            var watcher = root.Population.Spawn(NpcRole.Customer, new Vector3(-1.2f, 0, 10.5f), 0, true, profile);
+            var watcher = root.Population.Spawn(NpcRole.Customer, new Vector3(-4.2f, 0, 10.2f), 0, true, profile); // open floor between the Clothing tables
             var brain = ((CustomerBehavior)watcher.Behavior).Brain;
             float wait = Time.time + 20;
             while (Time.time < wait && brain.State != CustomerState.Browsing) yield return null;

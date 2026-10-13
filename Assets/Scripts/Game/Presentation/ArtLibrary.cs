@@ -174,6 +174,171 @@ namespace NightSupermarket.Game
             }
             return Materials[key] = material;
         }
+        private static Texture2D waterNormal, softDot;
+
+        /// <summary>
+        /// Clear, glossy water: a transparent smooth surface with a generated ripple normal map. Scroll the
+        /// map (see <see cref="WaterRipple"/>) and it moves without a custom shader.
+        /// </summary>
+        public static Material Water(Color tint)
+        {
+            string key = $"water:{tint}";
+            if (Materials.TryGetValue(key, out var cached)) return cached;
+            var material = NewTransparent(tint.a);
+            material.SetColor("_BaseColor", tint);
+            material.SetFloat("_Smoothness", 0.97f);
+            material.SetFloat("_Metallic", 0.1f);
+            waterNormal ??= RippleNormals(128);
+            material.SetTexture("_BumpMap", waterNormal);
+            material.SetFloat("_BumpScale", 0.6f);
+            material.SetTextureScale("_BaseMap", new Vector2(3f, 3f)); // URP Lit tiles every map with _BaseMap_ST
+            material.EnableKeyword("_NORMALMAP");
+            return Materials[key] = material;
+        }
+
+        public enum ScreenShow { Broadcast, Cctv }
+
+        /// <summary>
+        /// A television picture rather than a glowing slab: dark glass with the picture in its emission map,
+        /// scanlines and a darker rim like a real tube. Broadcast is a little sunset scene with a news bar;
+        /// CCTV is a green, grainy view of an aisle with a REC dot.
+        /// </summary>
+        public static Material Screen(Color tint, ScreenShow show, int seed)
+        {
+            string key = $"screen:{tint}:{show}:{seed % 4}";
+            if (Materials.TryGetValue(key, out var cached)) return cached;
+            var material = NewOpaque();
+            material.SetColor("_BaseColor", new Color(0.04f, 0.045f, 0.05f));
+            material.SetFloat("_Smoothness", 0.92f);
+            var picture = Picture(tint, show, seed % 4);
+            material.SetTexture("_BaseMap", picture);
+            material.EnableKeyword("_EMISSION");
+            material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            material.SetTexture("_EmissionMap", picture);
+            // The panel faces the viewer turned half round: show the picture the right way up.
+            material.SetTextureScale("_BaseMap", new Vector2(-1f, -1f));
+            material.SetTextureOffset("_BaseMap", new Vector2(1f, 1f));
+            material.SetColor("_EmissionColor", Color.white * 1.15f);
+            return Materials[key] = material;
+        }
+
+        private static Texture2D Picture(Color tint, ScreenShow show, int seed)
+        {
+            const int w = 96, h = 72;
+            var pixels = new Color[w * h];
+            var random = new System.Random(seed * 31 + (int)show);
+            float sunX = 0.3f + (float)random.NextDouble() * 0.4f;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = x / (float)(w - 1), v = y / (float)(h - 1);
+                    Color c;
+                    if (show == ScreenShow.Cctv)
+                    {
+                        // An aisle in perspective: floor, two shelf runs, a ceiling strip.
+                        float lane = Mathf.Abs(u - 0.5f) * 2f;
+                        bool shelf = lane > 0.35f + (1f - v) * 0.25f && v > 0.18f && v < 0.85f;
+                        float g = shelf ? 0.45f + 0.15f * Mathf.Sin(v * 60f) : v < 0.18f ? 0.25f : 0.6f;
+                        g += ((float)random.NextDouble() - 0.5f) * 0.12f; // grain
+                        c = new Color(g * 0.55f, g, g * 0.6f);
+                        if (u > 0.86f && u < 0.94f && v > 0.84f && v < 0.94f) c = new Color(1f, 0.15f, 0.1f);
+                        if (v > 0.88f && u < 0.45f) c *= 1.3f; // the timestamp strip
+                    }
+                    else
+                    {
+                        // Sky to tint, a low sun, dark hills and a news bar along the bottom.
+                        Color sky = Color.Lerp(tint * 0.9f + new Color(0.15f, 0.1f, 0.05f), new Color(0.08f, 0.1f, 0.25f), v);
+                        float sun = Mathf.Clamp01(1f - Vector2.Distance(new Vector2(u, v * 0.75f), new Vector2(sunX, 0.38f)) * 7f);
+                        c = sky + new Color(1f, 0.85f, 0.55f) * sun;
+                        float hill = 0.32f + 0.06f * Mathf.Sin(u * 9f + seed) + 0.03f * Mathf.Sin(u * 23f);
+                        if (v < hill) c = Color.Lerp(new Color(0.05f, 0.08f, 0.1f), tint * 0.3f, v / hill);
+                        if (v < 0.14f) c = v > 0.11f ? new Color(0.9f, 0.25f, 0.15f) : new Color(0.12f, 0.12f, 0.16f) + (((x / 3) % 5 == 0) ? new Color(0.5f, 0.5f, 0.5f) : Color.clear) * (v > 0.04f && v < 0.08f ? 1f : 0f);
+                    }
+                    if (y % 2 == 0) c *= 0.78f;                      // scanlines
+                    float rim = Mathf.Clamp01(Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v)) * 9f);
+                    c *= Mathf.Lerp(0.35f, 1f, rim);                  // darker towards the tube's edge
+                    c.a = 1f;
+                    pixels[y * w + x] = c;
+                }
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, true) { name = "Screen picture", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            texture.SetPixels(pixels);
+            texture.Apply(true, true);
+            return texture;
+        }
+
+        /// <summary>Soft additive-looking particle for spray, splashes and sparkles. Null when URP particle shaders are absent.</summary>
+        public static Material Particle(Color tint)
+        {
+            string key = $"particle:{tint}";
+            if (Materials.TryGetValue(key, out var cached)) return cached;
+            var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (shader == null) return null;
+            var material = new Material(shader);
+            softDot ??= SoftDot(32);
+            material.SetTexture("_BaseMap", softDot);
+            material.SetColor("_BaseColor", tint);
+            material.SetFloat("_Surface", 1); material.SetFloat("_Blend", 0);
+            material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha); material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_ZWrite", 0);
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.renderQueue = (int)RenderQueue.Transparent;
+            return Materials[key] = material;
+        }
+
+        /// <summary>A lit material with vertical stripes (u repeats <paramref name="count"/> times): canopies, awnings.</summary>
+        public static Material Stripes(Color a, Color b, int count, float smoothness = 0.35f)
+        {
+            string key = $"stripes:{a}:{b}:{count}";
+            if (Materials.TryGetValue(key, out var cached)) return cached;
+            var texture = new Texture2D(count * 8, 4, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, name = "Stripes" };
+            for (int x = 0; x < texture.width; x++)
+                for (int y = 0; y < texture.height; y++)
+                    texture.SetPixel(x, y, (x / 8) % 2 == 0 ? a : b);
+            texture.Apply();
+            var material = NewOpaque();
+            material.SetTexture("_BaseMap", texture);
+            material.SetColor("_BaseColor", Color.white);
+            material.SetFloat("_Smoothness", smoothness);
+            return Materials[key] = material;
+        }
+
+        private static Texture2D RippleNormals(int size)
+        {
+            var heights = new float[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size * Mathf.PI * 2f, v = y / (float)size * Mathf.PI * 2f;
+                    heights[y * size + x] = Mathf.Sin(u * 3f + v) * 0.5f + Mathf.Sin(v * 4f - u * 2f) * 0.35f + Mathf.Sin((u + v) * 7f) * 0.15f;
+                }
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, true, true) { wrapMode = TextureWrapMode.Repeat, name = "Water normals" };
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = heights[y * size + (x + 1) % size] - heights[y * size + (x + size - 1) % size];
+                    float dy = heights[((y + 1) % size) * size + x] - heights[((y + size - 1) % size) * size + x];
+                    var n = new Vector3(-dx * 1.5f, -dy * 1.5f, 1f).normalized;
+                    texture.SetPixel(x, y, new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1f));
+                }
+            texture.Apply();
+            return texture;
+        }
+
+        private static Texture2D SoftDot(int size)
+        {
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, name = "Soft dot" };
+            float half = (size - 1) * 0.5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Mathf.Sqrt((x - half) * (x - half) + (y - half) * (y - half)) / half;
+                    float a = Mathf.Clamp01(1f - d); a *= a;
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            texture.Apply();
+            return texture;
+        }
+
         private static Material NewOpaque()
         {
             if (opaque == null) opaque = Resources.Load<Material>("Materials/LitOpaque");

@@ -50,7 +50,11 @@ namespace NightSupermarket.Core
             new JobTemplate("lost-toy", "Return the lost toy to the service desk", ActionKind.Place, "toy", 1,
                 "Find the toy in Home, pick it up with E, then E at the Lost & Found on the service desk.", "Home", "grab", "lostfound", "toy"),
             new JobTemplate("fragile-vase", "Carry a vase to the Home rug without breaking it", ActionKind.Place, "vase", 1,
-                "Vases are in the aisles. Carrying rattles; a hard drop breaks it. G on the Home rug.", "Home", "carry", "home")
+                "Vases are in the aisles. Carrying rattles; a hard drop breaks it. G on the Home rug.", "Home", "carry", "home"),
+            new JobTemplate("carousel-ride", "Ride the toy-store carousel for one full turn", ActionKind.Place, "carousel", 1,
+                "Through the atrium to the toy store. Step on while it turns and hold the Display pose (right mouse) for a whole turn. Riding hides you; the stop does not.", "Toy store", "hold", "carousel"),
+            new JobTemplate("top-shelf-robot", "Take the robot from the toy store's top shelf", ActionKind.Collect, "robot", 1,
+                "Toy store, tall shelf by the step stool. Climb the stool, E on the robot. Run past a toy shelf and it rattles.", "Toy store", "grab")
         };
 
         public static JobTemplate Find(string id)

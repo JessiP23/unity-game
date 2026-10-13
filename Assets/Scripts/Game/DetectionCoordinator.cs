@@ -13,6 +13,8 @@ namespace NightSupermarket.Game
         public bool Observed { get; private set; }
         /// <summary>Set by the pose system when the held pose fits the department: counts like the display stand.</summary>
         public bool PoseCamouflage { get; set; }
+        /// <summary>Walking with the crowd: the guard doubts what he saw, like a mannequin on a fitting display stand.</summary>
+        public bool CrowdCover { get; set; }
         /// <summary>One forced movement on the next tick (a strain twitch). Consumed by Tick.</summary>
         public bool Twitch { get; set; }
         public DetectionCoordinator(PlayerMotor player, Transform guard, GameRulesAsset rules)
@@ -31,7 +33,7 @@ namespace NightSupermarket.Game
             Observed = visible;
             double speed = Twitch ? player.Rules.movementThreshold * 4 : player.ActualSpeed;
             Twitch = false;
-            Detection.Tick(visible, speed, delta, PoseCamouflage || (camouflage != null && camouflage.Active));
+            Detection.Tick(visible, speed, delta, PoseCamouflage || CrowdCover || (camouflage != null && camouflage.Active));
         }
     }
 }

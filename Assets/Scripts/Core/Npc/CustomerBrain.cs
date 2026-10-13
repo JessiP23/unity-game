@@ -45,6 +45,18 @@ namespace NightSupermarket.Core
         private readonly CustomerSettings settings;
         private readonly Random random;
         private double timer, duration;
+        private readonly CrowdPull pull;
+        private int saleSeen;
+        /// <summary>Heading to (or shopping at) a flash sale instead of the next thing on the list.</summary>
+        public bool OnSale { get; private set; }
+        /// <summary>The purchase just made was a sale bargain, not an item off the list.</summary>
+        public bool LastPickWasSale { get; private set; }
+        /// <summary>The purchase just made was an impulse buy while lingering by a job, not an item off the list.</summary>
+        public bool LastPickWasLinger { get; private set; }
+        /// <summary>Hanging around one of tonight's jobs (the director's spot group), or -1.</summary>
+        public int LingerGroup { get; private set; } = -1;
+        public bool Lingering => LingerGroup >= 0;
+        private double lingerSeconds;
         public CustomerState State { get; private set; }
         public DestinationKind Destination { get; private set; }
         public ZoneType? DestinationZone { get; private set; }
@@ -56,8 +68,9 @@ namespace NightSupermarket.Core
         public event Action<CustomerState> Changed;
         public event Action ItemPicked;
 
-        public CustomerBrain(ShoppingList list, CustomerSettings settings, Random random)
+        public CustomerBrain(ShoppingList list, CustomerSettings settings, Random random, CrowdPull pull = null)
         {
+            this.pull = pull;
             this.list = list ?? throw new ArgumentNullException(nameof(list));
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.random = random ?? throw new ArgumentNullException(nameof(random));
@@ -79,11 +92,13 @@ namespace NightSupermarket.Core
             switch (State)
             {
                 case CustomerState.Entering: if (arrived) NextDestination(); break;
-                case CustomerState.Walking: if (arrived) Begin(CustomerState.Browsing, Range(settings.BrowseMin, settings.BrowseMax)); break;
+                case CustomerState.Walking: if (arrived) Begin(CustomerState.Browsing, Lingering ? lingerSeconds : Range(settings.BrowseMin, settings.BrowseMax)); break;
                 case CustomerState.Browsing: if (timer >= duration) Begin(CustomerState.Shopping, settings.PickTime); break;
                 case CustomerState.Shopping:
                     if (timer < duration) break;
-                    list.MarkPicked(); Purchases++; ItemPicked?.Invoke();
+                    LastPickWasSale = OnSale; LastPickWasLinger = Lingering;
+                    if (OnSale || Lingering) { OnSale = false; LingerGroup = -1; } else list.MarkPicked();
+                    Purchases++; ItemPicked?.Invoke();
                     if (random.NextDouble() < settings.WaitChance) Begin(CustomerState.Waiting, Range(settings.WaitMin, settings.WaitMax));
                     else NextDestination();
                     break;
@@ -127,14 +142,58 @@ namespace NightSupermarket.Core
         /// <summary>The current destination could not be reached; drop it and move on.</summary>
         public void Unreachable()
         {
-            if (State == CustomerState.Walking) { list.Skip(); NextDestination(); }
+            if (State == CustomerState.Walking && (OnSale || Lingering)) { OnSale = false; LingerGroup = -1; NextDestination(); }
+            else if (State == CustomerState.Walking) { list.Skip(); NextDestination(); }
             else if (State == CustomerState.MovingToCheckout) Enter(CustomerState.Leaving, DestinationKind.Exit, null);
             else if (State == CustomerState.Entering) NextDestination();
             else if (State == CustomerState.Leaving) Enter(CustomerState.Gone, DestinationKind.None, null);
         }
 
+        /// <summary>A sale was just called: maybe drop what you are doing and go. Returns true if this shopper is going.</summary>
+        public bool HearSale()
+        {
+            if (pull == null || !pull.Active || saleSeen == pull.Version || OnSale || Lingering) return false;
+            if (State != CustomerState.Walking && State != CustomerState.Waiting && State != CustomerState.Browsing) return false;
+            if (random.NextDouble() >= CrowdPlan.SaleRedirect) return false;
+            GoToSale();
+            return true;
+        }
+
+        /// <summary>
+        /// Asked to hang around one of tonight's jobs for <paramref name="seconds"/>: walks to a spot in that
+        /// group, browses there, makes an impulse buy and carries on with the list. Returns false if busy.
+        /// </summary>
+        public bool Linger(ZoneType zone, int group, double seconds)
+        {
+            if (OnSale || Lingering || group < 0) return false;
+            if (State != CustomerState.Walking && State != CustomerState.Waiting && State != CustomerState.Browsing) return false;
+            Enter(CustomerState.Walking, DestinationKind.Department, zone);
+            LingerGroup = group; lingerSeconds = Math.Max(1, seconds);
+            return true;
+        }
+
+        /// <summary>The job's quiet moment: drift off and carry on shopping.</summary>
+        public void MoveOn()
+        {
+            if (!Lingering) return;
+            if (State == CustomerState.Walking || State == CustomerState.Browsing || State == CustomerState.Waiting) NextDestination();
+        }
+
+        private void GoToSale()
+        {
+            saleSeen = pull.Version;
+            Enter(CustomerState.Walking, DestinationKind.Department, pull.Zone);
+            OnSale = true;
+        }
+
         private void NextDestination()
         {
+            OnSale = false;
+            if (pull != null && pull.Active && saleSeen != pull.Version && VisitSeconds < settings.MaxVisitSeconds * 0.8)
+            {
+                if (random.NextDouble() < pull.Lure) { GoToSale(); return; }
+                saleSeen = pull.Version; // heard it, not interested
+            }
             var item = list.Current;
             if (item.HasValue) Enter(CustomerState.Walking, DestinationKind.Department, item.Value.Department);
             else if (Purchases > 0 && random.NextDouble() < settings.CheckoutChance) Enter(CustomerState.MovingToCheckout, DestinationKind.Checkout, ZoneType.Checkout);
@@ -150,6 +209,8 @@ namespace NightSupermarket.Core
 
         private void Enter(CustomerState state, DestinationKind destination, ZoneType? zone)
         {
+            // Any new destination ends a detour: leaving, checkout, or the next list item.
+            OnSale = false; LingerGroup = -1;
             timer = 0;
             Destination = destination; DestinationZone = zone; DestinationVersion++;
             SetState(state);

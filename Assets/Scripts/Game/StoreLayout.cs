@@ -32,6 +32,10 @@ namespace NightSupermarket.Game
             Zone(d, ZoneType.Warehouse, -15, 8, -8, 11.6f);
             Zone(d, ZoneType.Security, -15, 11.6f, -8, 15);
             Zone(d, ZoneType.Employee, 8, 5, 15, 15);
+            // The mall: shoppers come in through the atrium; the toy store opens off it.
+            Zone(d, ZoneType.EntranceExit, -3, -34.5f, 3, -31);
+            Zone(d, ZoneType.Atrium, -12, -33, 12, -15);
+            Zone(d, ZoneType.ToyStore, -30, -33, -12, -18);
             // Upstairs sits over Electronics and the staff room; zones are told apart by height.
             d.AddZone(ZoneType.Mezzanine, new Vector3(-1.2f, PrimitiveWorld.UpstairsY - 0.7f, 5), new Vector3(15, PrimitiveWorld.CeilingY + 0.5f, 15));
         }
@@ -61,10 +65,10 @@ namespace NightSupermarket.Game
             Browse(d, ZoneType.Clothing, -2.2f, 7.6f, 0);
             Browse(d, ZoneType.Clothing, -2.2f, 12.9f, 270);
             Browse(d, ZoneType.Clothing, -7.3f, 12.6f, 90);
-            Browse(d, ZoneType.Electronics, 2.4f, 13.4f, 0);
+            Browse(d, ZoneType.Electronics, 3.0f, 13.4f, 0);
             Browse(d, ZoneType.Electronics, 4.2f, 13.4f, 0);
             Browse(d, ZoneType.Electronics, 6.0f, 13.4f, 0);
-            Browse(d, ZoneType.Electronics, 2.4f, 10.1f, 0);
+            Browse(d, ZoneType.Electronics, 4.0f, 10.1f, 0);
             Browse(d, ZoneType.Electronics, 6.0f, 10.1f, 0);
             Browse(d, ZoneType.Home, 11.3f, 0f, 90);
             Browse(d, ZoneType.Home, 13.5f, -4.8f, 90);
@@ -78,13 +82,25 @@ namespace NightSupermarket.Game
             Browse(d, ZoneType.Home, 12.6f, 2.1f, 180);
             Browse(d, ZoneType.Supermarket, -8.6f, -4.2f, 90);
             float up = PrimitiveWorld.UpstairsY;
-            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(3.0f, up, 12.6f), 0);
-            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(5.4f, up, 12.6f), 0);
-            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(3.0f, up, 9.0f), 0);
-            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(6.4f, up, 9.0f), 0);
-            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(9.0f, up, 10.5f), 90);
+            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(4.6f, up, 12.6f), 0);
+            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(7.0f, up, 12.6f), 0);
+            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(4.6f, up, 9.0f), 0);
+            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(8.0f, up, 9.0f), 0);
+            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(9.4f, up, 10.5f), 90);
             d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(11.8f, up, 7.4f), 0);
-            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(4.0f, up, 6.2f), 180);
+            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(5.0f, up, 6.2f), 180);
+            // Atrium and toy store.
+            Browse(d, ZoneType.Atrium, -5.5f, -21.0f, 180);
+            Browse(d, ZoneType.Atrium, 5.5f, -27.0f, 0);
+            Browse(d, ZoneType.Atrium, -3.2f, -24.0f, 90);
+            Browse(d, ZoneType.Atrium, 3.2f, -24.0f, 270);
+            Browse(d, ZoneType.Atrium, -8.5f, -19.0f, 225);
+            Browse(d, ZoneType.Atrium, 8.5f, -29.0f, 45);
+            Browse(d, ZoneType.ToyStore, -27.8f, -21.5f, 270);
+            Browse(d, ZoneType.ToyStore, -27.8f, -29.5f, 270);
+            Browse(d, ZoneType.ToyStore, -21f, -30.8f, 180);
+            Browse(d, ZoneType.ToyStore, -15.5f, -24.0f, 90);
+            Browse(d, ZoneType.ToyStore, -17.2f, -21.2f, 135);
             Browse(d, ZoneType.Supermarket, 5.2f, -6.2f, 180);
             Browse(d, ZoneType.CustomerService, -6.8f, -12.5f, 180);
             d.AddPoint(ZoneType.Checkout, PointKind.Checkout, new Vector3(9.5f, 0, -10.4f), 180);
@@ -98,10 +114,11 @@ namespace NightSupermarket.Game
             d.AddPoint(ZoneType.EntranceExit, PointKind.Entrance, new Vector3(0, 0, -12.2f), 0);
             d.AddPoint(ZoneType.EntranceExit, PointKind.Entrance, new Vector3(-1.2f, 0, -12.6f), 0);
             d.AddPoint(ZoneType.EntranceExit, PointKind.Entrance, new Vector3(1.2f, 0, -12.6f), 0);
-            d.AddPoint<NpcSpawnPoint>(ZoneType.EntranceExit, PointKind.Spawn, new Vector3(-0.7f, 0, -14.2f), 0);
-            d.AddPoint<NpcSpawnPoint>(ZoneType.EntranceExit, PointKind.Spawn, new Vector3(0.7f, 0, -14.2f), 0);
-            d.AddPoint<NpcExitPoint>(ZoneType.EntranceExit, PointKind.Exit, new Vector3(-0.7f, 0, -14.2f), 180);
-            d.AddPoint<NpcExitPoint>(ZoneType.EntranceExit, PointKind.Exit, new Vector3(0.7f, 0, -14.2f), 180);
+            // Shoppers arrive and leave through the mall doors at the far end of the atrium.
+            d.AddPoint<NpcSpawnPoint>(ZoneType.EntranceExit, PointKind.Spawn, new Vector3(-0.7f, 0, -31.9f), 0);
+            d.AddPoint<NpcSpawnPoint>(ZoneType.EntranceExit, PointKind.Spawn, new Vector3(0.7f, 0, -31.9f), 0);
+            d.AddPoint<NpcExitPoint>(ZoneType.EntranceExit, PointKind.Exit, new Vector3(-0.7f, 0, -31.9f), 180);
+            d.AddPoint<NpcExitPoint>(ZoneType.EntranceExit, PointKind.Exit, new Vector3(0.7f, 0, -31.9f), 180);
         }
 
         private static void Work(StoreDirectory d)
@@ -115,6 +132,8 @@ namespace NightSupermarket.Game
             d.AddPoint(ZoneType.Electronics, PointKind.Work, new Vector3(4.2f, 0, 13.3f), 0);
             d.AddPoint(ZoneType.Clothing, PointKind.Work, new Vector3(-4.2f, 0, 10.1f), 0);
             d.AddPoint(ZoneType.Mezzanine, PointKind.Work, new Vector3(4.2f, PrimitiveWorld.UpstairsY, 13.3f), 0);
+            d.AddPoint(ZoneType.Atrium, PointKind.Work, new Vector3(-2.6f, 0, -27.6f), 0);
+            d.AddPoint(ZoneType.ToyStore, PointKind.Work, new Vector3(-21f, 0, -19.2f), 180);
         }
 
         private static void Zone(StoreDirectory d, ZoneType type, float x0, float z0, float x1, float z1) =>

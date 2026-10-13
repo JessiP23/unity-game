@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 namespace NightSupermarket.Core
 {
-    public enum ScoreEvent { RequiredJob, OptionalJob, CloseCall, PoseMatch, Comeback, EscapeTime, Report, Capture, Admired, Gem }
+    public enum ScoreEvent { RequiredJob, OptionalJob, CloseCall, PoseMatch, Comeback, EscapeTime, Report, Capture, Admired, Gem, Wish, Dare }
 
     /// <summary>One line of the end-of-night card.</summary>
     public readonly struct ScoreLine
@@ -33,6 +33,8 @@ namespace NightSupermarket.Core
         public int CloseCalls { get; private set; }
         public int BestStreakSeconds { get; private set; }
         public double Multiplier => Streak >= StreakTierTwo ? 2 : Streak >= StreakTierOne ? 1.5 : 1;
+        /// <summary>The shift's difficulty (see <see cref="DifficultyRules.ScoreFactor"/>): scales everything earned, never penalties.</summary>
+        public double DifficultyFactor { get; set; } = 1;
 
         /// <summary>Unseen time grows the streak; a watcher reaching red ends it.</summary>
         public void TickUnseen(double delta)
@@ -54,11 +56,13 @@ namespace NightSupermarket.Core
                 ScoreEvent.Comeback => ComebackPoints,
                 ScoreEvent.Admired => AdmiredPoints,
                 ScoreEvent.Gem => GemPoints,
+                ScoreEvent.Wish => FountainWish.FortunePoints,
+                ScoreEvent.Dare => NightDare.Points,
                 ScoreEvent.Report => -ReportPenalty,
                 ScoreEvent.Capture => -CapturePenalty,
                 _ => 0
             };
-            double factor = basePoints > 0 ? Multiplier : 1;
+            double factor = basePoints > 0 ? Multiplier * DifficultyFactor : 1;
             int points = (int)Math.Round(basePoints * factor);
             if (evt == ScoreEvent.CloseCall) CloseCalls++;
             if (evt == ScoreEvent.Capture) BreakStreak();
@@ -70,8 +74,8 @@ namespace NightSupermarket.Core
         /// <summary>Seconds left on the clock when the team escaped.</summary>
         public int AddEscapeTime(double secondsLeft)
         {
-            int points = (int)Math.Max(0, secondsLeft) * PointsPerSecondLeft;
-            lines.Add(new ScoreLine(ScoreEvent.EscapeTime, (int)secondsLeft + " s before dawn", points, 1));
+            int points = (int)Math.Round((int)Math.Max(0, secondsLeft) * PointsPerSecondLeft * DifficultyFactor);
+            lines.Add(new ScoreLine(ScoreEvent.EscapeTime, (int)secondsLeft + " s before dawn", points, DifficultyFactor));
             Total += points;
             return points;
         }
@@ -95,6 +99,8 @@ namespace NightSupermarket.Core
             ScoreEvent.Comeback => "Comeback from the back hall",
             ScoreEvent.Admired => "A shopper admired you",
             ScoreEvent.Gem => "Hidden gem",
+            ScoreEvent.Wish => "Fountain wish",
+            ScoreEvent.Dare => "Nightly dare",
             ScoreEvent.EscapeTime => "Time left",
             ScoreEvent.Report => "Reported by a shopper",
             ScoreEvent.Capture => "Caught",

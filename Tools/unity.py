@@ -29,7 +29,7 @@ def check_results(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['setup', 'edit', 'play', 'build', 'prototype', 'open', 'shots', 'connect'])
+    parser.add_argument('action', choices=['setup', 'edit', 'play', 'build', 'mac', 'prototype', 'open', 'shots', 'connect'])
     args = parser.parse_args()
     editor = editor_path()
     if editor is None:
@@ -55,7 +55,7 @@ def main():
             command += ['-testFilter', 'FusionConnectionTests']
             print('Photon connect test', flush=True)
     else:
-        method = {'setup': 'ProjectSetup.Configure', 'build': 'ProjectSetup.BuildWindows', 'prototype': 'PrototypeSetup.Create'}[args.action]
+        method = {'setup': 'ProjectSetup.Configure', 'build': 'ProjectSetup.BuildWindows', 'mac': 'ProjectSetup.BuildMac', 'prototype': 'PrototypeSetup.Create'}[args.action]
         command += ['-quit', '-executeMethod', 'NightSupermarket.Editor.' + method]
     print('Unity log:', log, flush=True)
     result = subprocess.run(command, cwd=ROOT)

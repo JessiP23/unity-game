@@ -9,6 +9,8 @@ namespace NightSupermarket.Game
         private CarrySystem carry;
         private Vector3 position;
         private float heading;
+        /// <summary>True when the body is dressed for the display: a stolen shirt in the bag, or clothes borrowed off a rack.</summary>
+        public static System.Func<PlayerMotor, bool> Dressed;
         public bool Active
         {
             get
@@ -21,7 +23,7 @@ namespace NightSupermarket.Game
             }
         }
         private bool Eligible() => motor != null && motor.Record.Free && motor.Grounded &&
-            motor.ActualSpeed <= motor.Rules.movementThreshold && inventory != null && inventory.Items.Count("shirt") > 0 &&
+            motor.ActualSpeed <= motor.Rules.movementThreshold && (inventory != null && inventory.Items.Count("shirt") > 0 || Dressed != null && Dressed(motor)) &&
             (carry == null || carry.Held == null);
         public bool TryPose(DisplayPose spot)
         {

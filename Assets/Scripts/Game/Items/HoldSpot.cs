@@ -19,6 +19,9 @@ namespace NightSupermarket.Game
         public bool AutoStart;
         /// <summary>Only start when nobody is looking at the player.</summary>
         public Func<PlayerMotor, bool> CanStart;
+        /// <summary>While this returns false the hold keeps its worker but makes no progress (the ride has stopped).</summary>
+        public Func<bool> Gate;
+        public string GateHint = "Wait…";
         public string StartHint = "E — start";
         public string BlockedHint = "Wait until nobody is looking";
         public string DoneHint = "Done";
@@ -45,6 +48,7 @@ namespace NightSupermarket.Game
         {
             if (Complete) return DoneHint;
             if (Worker == player && Time.time < movedUntil) return MovedHint;
+            if (Worker == player && Gate != null && !Gate()) return GateHint;
             if (Worker == player) return Label + " · hold still " + Mathf.CeilToInt(Seconds - Progress) + " s";
             if (CanStart != null && !CanStart(player)) return BlockedHint;
             return StartHint;
@@ -91,6 +95,7 @@ namespace NightSupermarket.Game
                 return;
             }
             wasMoving = false;
+            if (Gate != null && !Gate()) return;
             Progress += delta;
             if (Progress < Seconds) return;
             Complete = true;

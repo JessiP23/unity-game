@@ -60,7 +60,7 @@ namespace NightSupermarket.Tests
                 shirts++;
                 var at = item.transform.position;
                 Assert.That(at.y, Is.GreaterThan(0.85f), "shirt fell off its table to " + at);
-                Assert.That(Mathf.Abs(at.z - 9.0f), Is.LessThan(0.5f), "shirt left the table row: " + at);
+                Assert.That(Mathf.Abs(at.z - 8.8f), Is.LessThan(0.4f), "shirt left the table row: " + at);
             }
             Assert.That(shirts, Is.EqualTo(2));
             var root = Object.FindAnyObjectByType<PrototypeRoot>();
@@ -71,7 +71,7 @@ namespace NightSupermarket.Tests
             Physics.SyncTransforms();
             var probe = player.GetComponent<InteractionProbe>();
             var view = player.GetComponent<PlayerView>();
-            var target = probe.FindTarget(view.View.transform.position, (new Vector3(-6.2f, 0.94f, 9.0f) - view.View.transform.position).normalized);
+            var target = probe.FindTarget(view.View.transform.position, (new Vector3(-6.2f, 0.94f, 8.8f) - view.View.transform.position).normalized);
             Assert.That(target, Is.Not.Null, "looking at the shirt from the aisle offers nothing");
             Assert.That(target is PhysicalItem p && p.Definition.missionTag == "shirt", Is.True, "offered " + target);
         }
@@ -82,8 +82,11 @@ namespace NightSupermarket.Tests
             yield return SceneManager.LoadSceneAsync("Prototype"); yield return null;
             var root = Object.FindAnyObjectByType<PrototypeRoot>();
             var signals = (WorldSignals)typeof(PrototypeRoot).GetField("signals", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(root);
+            // Open aisle floor between the shelves at x -5 and 0, facing up the aisle.
+            root.Player.Teleport(new Vector3(-2.5f, 0.1f, -1.5f));
+            root.Player.transform.rotation = Quaternion.identity;
             var host = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            host.name = "Test hold"; host.transform.position = root.Player.transform.position + root.Player.transform.forward * 1.2f + Vector3.up;
+            host.name = "Test hold"; host.transform.position = root.Player.transform.position + Vector3.forward * 1.2f + Vector3.up;
             var spot = host.AddComponent<HoldSpot>();
             spot.Configure(root.Authority, signals, ActionKind.Steal, "test-hold");
             spot.Seconds = 1f;

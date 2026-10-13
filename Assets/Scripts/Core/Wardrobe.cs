@@ -38,10 +38,10 @@ namespace NightSupermarket.Core
 
         public static string Describe(Outfit outfit) => outfit switch
         {
-            Outfit.ShopperCoat => "blends in the aisles",
-            Outfit.BoutiqueBlack => "blends in Clothing",
+            Outfit.ShopperCoat => "blends in the aisles and the atrium",
+            Outfit.BoutiqueBlack => "blends in Clothing and the toy store",
             Outfit.TechTee => "blends in Electronics",
-            Outfit.Loungewear => "blends in Home and Upstairs",
+            Outfit.Loungewear => "blends in Home, Upstairs and the atrium benches",
             Outfit.StaffApron => "blends in Checkout, Service and every staff room",
             _ => "blends nowhere — your pose is all you have"
         };
@@ -52,10 +52,10 @@ namespace NightSupermarket.Core
             if (zone == null) return false;
             switch (outfit)
             {
-                case Outfit.ShopperCoat: return zone == ZoneType.Supermarket;
-                case Outfit.BoutiqueBlack: return zone == ZoneType.Clothing;
+                case Outfit.ShopperCoat: return zone == ZoneType.Supermarket || zone == ZoneType.Atrium;
+                case Outfit.BoutiqueBlack: return zone == ZoneType.Clothing || zone == ZoneType.ToyStore;
                 case Outfit.TechTee: return zone == ZoneType.Electronics;
-                case Outfit.Loungewear: return zone == ZoneType.Home || zone == ZoneType.Mezzanine;
+                case Outfit.Loungewear: return zone == ZoneType.Home || zone == ZoneType.Mezzanine || zone == ZoneType.Atrium;
                 case Outfit.StaffApron:
                     return zone == ZoneType.Checkout || zone == ZoneType.CustomerService || zone == ZoneType.Warehouse || zone == ZoneType.Employee || zone == ZoneType.Security;
                 default: return false;

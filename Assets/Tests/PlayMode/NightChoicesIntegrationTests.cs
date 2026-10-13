@@ -50,7 +50,7 @@ namespace NightSupermarket.Tests
             Assert.That(root.Authority.Stats.Bonuses, Is.EqualTo(1));
             Assert.That(display.TryInteract(player), Is.False);
             foreach (var mission in root.Missions.Missions) mission.DebugComplete();
-            var exit = Object.FindAnyObjectByType<EscapeInteractable>();
+            var exit = GameObject.Find("Escape door").GetComponent<EscapeInteractable>(); // not the upstairs fire exit
             player.Teleport(new Vector3(exit.transform.position.x, 0.1f, exit.transform.position.z + 1.1f)); Physics.SyncTransforms();
             Assert.That(exit.TryInteract(player), Is.True, "remaining optional stand must not gate escape");
         }

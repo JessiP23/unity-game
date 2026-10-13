@@ -265,9 +265,11 @@ namespace NightSupermarket.Tests
         {
             var settings = Population();
             Assert.That(settings, Is.Not.Null, "Assets/Resources/Npc/NpcPopulation.asset is the source of truth");
-            Assert.That(settings.minimumCustomers, Is.EqualTo(6));
-            Assert.That(settings.maximumCustomers, Is.EqualTo(12));
-            Assert.That(settings.maxActiveCustomers, Is.EqualTo(16));
+            Assert.That(settings.minimumCustomers, Is.EqualTo(10));
+            Assert.That(settings.maximumCustomers, Is.EqualTo(20));
+            Assert.That(settings.maxActiveCustomers, Is.EqualTo(40), "the busiest a night can get on any machine");
+            Assert.That(settings.budgetFloor, Is.LessThanOrEqualTo(settings.startingBudget));
+            Assert.That(settings.startingBudget, Is.LessThanOrEqualTo(settings.maxActiveCustomers));
             Assert.That(settings.profiles.Length, Is.EqualTo(5));
         }
 

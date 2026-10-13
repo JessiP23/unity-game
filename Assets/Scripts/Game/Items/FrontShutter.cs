@@ -14,11 +14,14 @@ namespace NightSupermarket.Game
         private float top, bottom;
         public bool Down { get; private set; }
 
-        public static FrontShutter Create(Transform parent, EscapeInteractable frontDoor, Vector3 floorPoint)
+        public static FrontShutter Create(Transform parent, EscapeInteractable frontDoor, Vector3 floorPoint, float width = 1.7f)
         {
-            var slab = PrimitiveWorld.Box(parent, "Front shutter", floorPoint + new Vector3(0, 1.35f + 2.8f, 0), new Vector3(1.7f, 2.7f, 0.12f), new Color(0.45f, 0.47f, 0.5f));
+            var slab = PrimitiveWorld.Box(parent, "Front shutter", floorPoint + new Vector3(0, 1.35f + 2.8f, 0), new Vector3(width, 2.7f, 0.12f), new Color(0.45f, 0.47f, 0.5f));
             slab.GetComponent<Renderer>().sharedMaterial = ArtLibrary.Lit(new Color(0.5f, 0.52f, 0.55f), 0.6f, 0.9f);
             var shutter = slab.AddComponent<FrontShutter>();
+            // Shoppers still inside turn back from it instead of walking into it.
+            var obstacle = slab.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+            obstacle.shape = UnityEngine.AI.NavMeshObstacleShape.Box; obstacle.size = new Vector3(1f, 1f, 4f); obstacle.carving = true;
             shutter.door = frontDoor;
             shutter.top = floorPoint.y + 1.35f + 2.8f;
             shutter.bottom = floorPoint.y + 1.35f;

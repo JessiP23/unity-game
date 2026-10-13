@@ -22,6 +22,10 @@
 | Redesign | Readable HUD, capture flow, fair detection, scoring, night schedule, poses, seeded shifts, six back-hall trials | Compiled and Core-tested 2026-10-07; needs an Editor play run. See redesign.md |
 | Redesign 2–4 | Job pool and props, cameras, procedural poses, shopper reactions, guard roster, career gadgets, per-shift leaderboard with optional shared server | Compiled, 72 Core tests pass 2026-10-08; PlayMode and feel need an Editor run. Online co-op planned only: coop-plan.md |
 | Redesign 5 | Hidden gems, outfits as camouflage, second floor with escalator and fire exit, lockdown shutter, closing-time light sweep, skylights | Compiled, 77 Core tests pass 2026-10-08; MezzanineTests need an Editor run. See redesign.md |
+| Redesign 6 | Moving escalator and stairs, atrium with cameras, toy store with carousel and rattling shelves, two jobs, lockdown over the supermarket doors | Compiled, 77 Core tests pass 2026-10-09; MallTests need an Editor run. See redesign.md |
+| Redesign 7 | Real fountain with wish, carousel models, Clothing try-on and E badge, fitted screens, plank capture, photo booth, nightly dare and streak | Compiled, 80 Core tests pass 2026-10-11; MallPolishTests and new art need a Mac run. See redesign.md |
+| Redesign 8 | Busier mall: 10–20 shoppers growing 10% a night to +80%, group arrivals, two flash sales a night on tonight's job departments, live frame-rate budget up to 40, crowd LOD | Compiled, 91 Core tests pass 2026-10-12; MallCrowdTests (PlayMode) need a Mac run. See redesign.md |
+| Redesign 9 | Hide in the crowd, crowds at jobs with quiet windows, heat map and job crowd chip, families/phone zombies/influencer/cleaners/restockers, shift card (Relaxed/Normal/Rush hour), night metrics | Compiled, 104 Core tests pass 2026-10-13; MallCrowdLifeTests (PlayMode) need a Mac run. See redesign.md |
 | Art | Models, environment, animations, audio, UI | After programming acceptance |
 | Polish | Final refinement | After asset integration |
 

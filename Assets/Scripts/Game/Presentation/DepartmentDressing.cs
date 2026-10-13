@@ -108,7 +108,8 @@ namespace NightSupermarket.Game
             float front = center.z - size.z * 0.5f;
             float floor = center.y - size.y * 0.5f; // the same wall stands on the ground floor and on the mezzanine
             Panel(parent, "TV ledge", new Vector3(center.x, floor + 1.0f, front - 0.2f), new Vector3(size.x, 0.05f, 0.45f)).sharedMaterial = ArtLibrary.Lit(new Color(0.1f, 0.1f, 0.11f), 0.5f);
-            Color[] glows = { new Color(0.3f, 0.55f, 1f), new Color(0.4f, 1f, 0.6f), new Color(1f, 0.6f, 0.3f), new Color(0.8f, 0.4f, 1f) };
+            // Bluish violet, not magenta: magenta is reserved as the "missing material" warning colour.
+            Color[] glows = { new Color(0.3f, 0.55f, 1f), new Color(0.4f, 1f, 0.6f), new Color(1f, 0.6f, 0.3f), new Color(0.55f, 0.45f, 1f) };
             for (int row = 0; row < 2; row++)
                 for (int i = 0; i < 4; i++)
                 {
@@ -118,10 +119,12 @@ namespace NightSupermarket.Game
                     string id = (i + row) % 2 == 0 ? "Television_01" : "television_02";
                     var tv = ArtLibrary.Spawn(id, parent, new Vector3(x, y, z), 180);
                     if (tv == null) continue;
+                    var glow = ArtLibrary.Screen(glows[rng.Next(glows.Length)], ArtLibrary.ScreenShow.Broadcast, row * 4 + i);
+                    // Flush on the glass, measured from the model, and inside the bezel.
+                    if (FitScreen(parent, tv, Vector3.back, 0.56f, glow) != null) continue;
                     var bounds = ArtLibrary.BoundsOf(tv);
-                    var glow = glows[rng.Next(glows.Length)];
-                    Panel(parent, "TV screen", new Vector3(x, bounds.center.y + bounds.size.y * 0.06f, bounds.min.z - 0.005f), new Vector3(bounds.size.x * 0.62f, bounds.size.y * 0.5f, 0.005f))
-                        .sharedMaterial = ArtLibrary.Emissive(glow, 1.4f);
+                    Panel(parent, "TV screen", new Vector3(x, bounds.center.y + bounds.size.y * 0.06f, bounds.min.z - 0.003f), new Vector3(bounds.size.x * 0.6f, bounds.size.y * 0.48f, 0.005f))
+                        .sharedMaterial = glow;
                 }
             lighting.AddGlow(new Vector3(center.x, floor + 1.6f, front - 0.8f), new Color(0.45f, 0.75f, 1f), 3.2f, 0.4f);
         }
@@ -196,14 +199,14 @@ namespace NightSupermarket.Game
         /// <summary>Open glass doors onto the dark street, where customers come and go.</summary>
         public static void Entrance(Transform parent, StoreLighting lighting)
         {
+            // The supermarket's doors stand open onto the mall atrium: posts, a header, the glass slid aside.
             var frame = ArtLibrary.Lit(new Color(0.55f, 0.56f, 0.6f), 0.7f, 0.9f);
-            Panel(parent, "Night outside", new Vector3(0, 1.25f, -14.735f), new Vector3(3.2f, 2.5f, 0.01f)).sharedMaterial = ArtLibrary.Emissive(new Color(0.05f, 0.07f, 0.14f), 0.55f);
-            foreach (float x in new[] { -1.65f, 1.65f })
-                Panel(parent, "Door post", new Vector3(x, 1.25f, -14.68f), new Vector3(0.1f, 2.5f, 0.12f)).sharedMaterial = frame;
-            Panel(parent, "Door header", new Vector3(0, 2.55f, -14.68f), new Vector3(3.4f, 0.12f, 0.14f)).sharedMaterial = frame;
+            foreach (float x in new[] { -1.85f, 1.85f })
+                Panel(parent, "Door post", new Vector3(x, 1.5f, -14.68f), new Vector3(0.1f, 3f, 0.12f)).sharedMaterial = frame;
+            Panel(parent, "Door header", new Vector3(0, 2.95f, -14.68f), new Vector3(3.8f, 0.12f, 0.14f)).sharedMaterial = frame;
             var glass = ArtLibrary.Glass(new Color(0.7f, 0.85f, 0.95f, 0.18f));
-            foreach (float x in new[] { -1.25f, 1.25f })
-                Panel(parent, "Sliding door", new Vector3(x, 1.22f, -14.6f), new Vector3(0.75f, 2.35f, 0.03f)).sharedMaterial = glass;
+            foreach (float x in new[] { -2.7f, 2.7f })
+                Panel(parent, "Sliding door", new Vector3(x, 1.45f, -14.6f), new Vector3(1.6f, 2.8f, 0.03f)).sharedMaterial = glass;
             lighting.AddGlow(new Vector3(0, 2.3f, -14.3f), new Color(0.45f, 0.85f, 1f), 2.6f, 0.35f);
         }
 

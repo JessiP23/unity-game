@@ -249,7 +249,8 @@ namespace NightSupermarket.Tests
                 Assert.That(reports.Count, Is.EqualTo(1));
                 var report = reports[0];
                 var at = new Vector3(report.LastKnownPosition.X, 0, report.LastKnownPosition.Z);
-                Assert.That(Vector3.Distance(at, Flat(a)), Is.LessThan(0.6f), "A: last place the customer saw it");
+                // Shoppers sample every 0.2 s; at 3 m/s that is 0.6 m between looks, plus one physics step of slack.
+                Assert.That(Vector3.Distance(at, Flat(a)), Is.LessThan(0.75f), "A: last place the customer saw it");
                 Assert.That(Vector3.Distance(at, Flat(b)), Is.GreaterThan(3f), "not B");
                 Assert.That(Vector3.Distance(Flat(b), Flat(c)), Is.GreaterThan(0.5f), "it kept moving out of sight");
                 Assert.That(Vector3.Distance(at, Flat(c)), Is.GreaterThan(3f), "not C");

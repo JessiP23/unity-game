@@ -72,6 +72,26 @@ namespace NightSupermarket.Editor
             settings.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>
+        /// Builds the Mac app people can play without Unity: Builds/Mac/Night Mall.app (release, not development).
+        /// Zip it to share; on another Mac, right-click the app and choose Open the first time (it is not signed).
+        /// </summary>
+        public static void BuildMac()
+        {
+            var scenes = Array.FindAll(EditorBuildSettings.scenes, scene => scene.enabled);
+            if (scenes.Length == 0) throw new InvalidOperationException("Run Configure first.");
+            PlayerSettings.productName = "Night Mall";
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = Array.ConvertAll(scenes, scene => scene.path),
+                locationPathName = "Builds/Mac/Night Mall.app",
+                target = BuildTarget.StandaloneOSX,
+                options = BuildOptions.None
+            });
+            if (report.summary.result != BuildResult.Succeeded)
+                throw new InvalidOperationException("Mac build failed: " + report.summary.result);
+        }
+
         /// <summary>Builds a development Windows player; throws on any build failure.</summary>
         public static void BuildWindows()
         {

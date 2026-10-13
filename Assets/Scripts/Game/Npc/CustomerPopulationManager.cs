@@ -12,6 +12,8 @@ namespace NightSupermarket.Game
     /// </summary>
     public sealed class CustomerPopulationManager : MonoBehaviour
     {
+        /// <summary>What shoppers can put on their lists. Test arenas keep the four classic departments; the mall adds its own.</summary>
+        public ShoppingCatalog Catalog { get; set; } = ShoppingCatalog.Default;
         private static readonly Color[] Tints = { new Color(0.35f, 0.55f, 0.85f), new Color(0.85f, 0.45f, 0.35f), new Color(0.5f, 0.75f, 0.45f), new Color(0.8f, 0.7f, 0.3f), new Color(0.6f, 0.45f, 0.75f) };
         private readonly List<NpcController> active = new List<NpcController>();
         private readonly List<NpcController> pool = new List<NpcController>();
@@ -30,6 +32,19 @@ namespace NightSupermarket.Game
         public NpcPopulationSettings Settings => settings;
         /// <summary>Night-schedule share of the normal crowd. 1 = the settings asset; 0 = nobody new comes in.</summary>
         public float CrowdScale { get; set; } = 1f;
+        /// <summary>How far into their career the player is; each level brings more people (see <see cref="CrowdPlan"/>).</summary>
+        public int Level { get; set; }
+        /// <summary>Live frame-rate budget: never more shoppers than this, whatever the night wants. Starts at the hard cap.</summary>
+        public int Budget { get; set; } = int.MaxValue;
+        /// <summary>Where a flash sale is pulling the crowd. Every shopper's brain reads it.</summary>
+        public CrowdPull Pull { get; } = new CrowdPull();
+        public int Cap => Mathf.Min(settings != null ? settings.maxActiveCustomers : 0, Budget);
+        /// <summary>The shift's difficulty share of the crowd (see <see cref="DifficultyRules.CrowdFactor"/>).</summary>
+        public float DifficultyFactor { get; set; } = 1f;
+        /// <summary>Chance a group arriving together is a grown-up with kids. Zero keeps every arrival an ordinary shopper.</summary>
+        public float FamilyChance { get; set; }
+        /// <summary>Chance any one arrival is glued to their phone.</summary>
+        public float PhoneChance { get; set; }
 
         public void Configure(StoreDirectory store, NpcPopulationSettings population, Func<SuspiciousActivityEvent, bool> sink, Func<double> time, bool authority, int seed)
         {
@@ -59,29 +74,66 @@ namespace NightSupermarket.Game
             spawnTimer = settings.spawnInterval * 0.5f;
         }
 
-        /// <summary>Target crowd drifts slowly between minimum and maximum so the store ebbs and flows.</summary>
-        public int TargetCustomers
-        {
-            get
-            {
-                float wave = 0.5f + 0.5f * Mathf.Sin(elapsed / settings.crowdCycleSeconds * Mathf.PI * 2f);
-                return Mathf.Min(settings.maxActiveCustomers, Mathf.RoundToInt(Mathf.Lerp(settings.minimumCustomers, settings.maximumCustomers, wave) * Mathf.Clamp01(CrowdScale)));
-            }
-        }
+        /// <summary>Target crowd drifts slowly between minimum and maximum so the store ebbs and flows; see <see cref="CrowdPlan.Target"/>.</summary>
+        public int TargetCustomers => CrowdPlan.Target(settings.minimumCustomers, settings.maximumCustomers, elapsed, settings.crowdCycleSeconds, Mathf.Clamp01(CrowdScale), Level, Pull.Active, Cap, DifficultyFactor);
 
         private void Update()
         {
             if (!Authority || settings == null) return;
             elapsed += Time.deltaTime;
             spawnTimer -= Time.deltaTime;
-            if (spawnTimer > 0 || Customers >= TargetCustomers) return;
-            spawnTimer = settings.spawnInterval * (0.6f + (float)random.NextDouble() * 0.8f);
+            int shortfall = TargetCustomers - Customers;
+            if (spawnTimer > 0 || shortfall <= 0) return;
+            spawnTimer = (float)CrowdPlan.ArrivalGap(settings.spawnInterval, shortfall, random.NextDouble());
+            // People come in ones, couples and little groups: a group shares a door and walks in side by side.
+            int group = CrowdPlan.Arrivals(shortfall, random.NextDouble());
             var door = directory.Pick(PointKind.Spawn, null, ZoneAccess.Customer, random, -1);
-            if (door != null) Spawn(NpcRole.Customer, door.Position, door.transform.eulerAngles.y, false);
+            if (door == null) return;
+            Vector3 side = door.transform.right;
+            // A group of two or more may be a family: one grown-up and the rest kids at their side.
+            bool family = group >= 2 && random.NextDouble() < FamilyChance;
+            CustomerBehavior leader = null;
+            for (int i = 0; i < group; i++)
+            {
+                Vector3 at = door.Position + side * ((i - (group - 1) * 0.5f) * 0.65f) - door.transform.forward * (0.5f * (i / 2));
+                if (NavMesh.SamplePosition(at, out var hit, 0.6f, NavMesh.AllAreas)) at = hit.position; else at = door.Position;
+                if (family && i > 0 && leader != null)
+                {
+                    Spawn(NpcRole.Customer, at, door.transform.eulerAngles.y, false, ShopperArchetypes.Kid(), ShopperKind.Kid, leader);
+                    continue;
+                }
+                bool phone = !family && random.NextDouble() < PhoneChance;
+                var npc = Spawn(NpcRole.Customer, at, door.transform.eulerAngles.y, false, phone ? ShopperArchetypes.PhoneZombie() : null, phone ? ShopperKind.PhoneZombie : ShopperKind.Regular);
+                if (family && i == 0) { leader = npc.Behavior as CustomerBehavior; npc.Movement.SetPace(0.85f); } // families dawdle
+            }
+        }
+
+        /// <summary>A flash sale opens: the pull points at the zone, and some of the people already shopping head straight there.</summary>
+        public int CallSale(ZoneType zone)
+        {
+            Pull.Open(zone);
+            int going = 0;
+            if (!Authority) return 0;
+            foreach (var npc in active)
+                if (npc.Role == NpcRole.Customer && npc.Behavior is CustomerBehavior shopper && shopper.Brain != null && shopper.Brain.HearSale()) going++;
+            return going;
+        }
+
+        public void EndSale() => Pull.Close();
+
+        /// <summary>Customers currently heading to or shopping at the sale.</summary>
+        public int AtSale
+        {
+            get
+            {
+                int n = 0;
+                foreach (var npc in active) if (npc.Behavior is CustomerBehavior c && c.Brain != null && c.Brain.OnSale) n++;
+                return n;
+            }
         }
 
         /// <summary>Spawns one NPC. <paramref name="profile"/> overrides the random personality (scripted events, tests).</summary>
-        public NpcController Spawn(NpcRole role, Vector3 position, float yaw, bool alreadyInside, CustomerProfile profile = null)
+        public NpcController Spawn(NpcRole role, Vector3 position, float yaw, bool alreadyInside, CustomerProfile profile = null, ShopperKind kind = ShopperKind.Regular, CustomerBehavior leader = null)
         {
             var npc = TakeFromPool(role) ?? Build(role, nextId);
             int id = nextId++;
@@ -93,24 +145,27 @@ namespace NightSupermarket.Game
             if (Authority)
             {
                 npc.Movement.Warp(position);
-                if (role == NpcRole.Customer) BeginCustomer(npc, rng, alreadyInside, profile);
+                if (role == NpcRole.Customer) BeginCustomer(npc, rng, alreadyInside, profile, kind, leader);
                 else BeginEmployee(npc, rng);
             }
             active.Add(npc); byId[id] = npc;
             return npc;
         }
 
-        private void BeginCustomer(NpcController npc, Random rng, bool alreadyInside, CustomerProfile chosen)
+        private void BeginCustomer(NpcController npc, Random rng, bool alreadyInside, CustomerProfile chosen, ShopperKind kind, CustomerBehavior leader)
         {
             var profile = chosen != null ? chosen : settings.profiles[rng.Next(settings.profiles.Length)];
             npc.Movement.Configure(profile.RollWalkSpeed(rng), NavigationAreas.CivilianMask, 40 + rng.Next(20));
             npc.Navigation.Configure(directory, ZoneAccess.Customer, rng, npc.Id);
             npc.Perception.Configure(profile.visionRange, profile.fieldOfView, profile.perceptionInterval, profile.CreateAwareness(rng), (float)rng.NextDouble());
-            var list = ShoppingListGenerator.Create(ShoppingCatalog.Default, profile.Preferences(), profile.items.x, profile.items.y, rng);
+            var list = ShoppingListGenerator.Create(Catalog, profile.Preferences(), profile.items.x, profile.items.y, rng);
             var behavior = (CustomerBehavior)npc.Behavior;
             behavior.Attach(npc, reportSink, clock);
             npc.GetComponent<NpcShopping>().Clear();
-            behavior.Begin(list, profile.CreateSettings(rng), rng, alreadyInside);
+            behavior.Begin(list, profile.CreateSettings(rng), rng, alreadyInside, Pull, kind, leader);
+            Dress(npc, kind);
+            // An influencer's camera sees right through a crowd; a kid's eyes nearly do.
+            if (npc.Perception != null) npc.Perception.CrowdBlind = kind == ShopperKind.Influencer ? 0f : kind == ShopperKind.Kid ? 0.5f : 1f;
         }
 
         private void BeginEmployee(NpcController npc, Random rng)
@@ -126,8 +181,17 @@ namespace NightSupermarket.Game
             npc.Perception.Configure(settings.employeeVisionRange, settings.employeeFieldOfView, 0.2f, awareness, (float)rng.NextDouble());
             var behavior = (EmployeeBehavior)npc.Behavior;
             behavior.workSeconds = settings.employeeWorkSeconds;
+            behavior.Errand = null;
+            Dress(npc, ShopperKind.Regular);
             behavior.Attach(npc, reportSink, clock);
             behavior.Begin(rng);
+        }
+
+        /// <summary>Pose, size and props for a kind of person. Also used to turn a staff member into a cleaner or restocker.</summary>
+        public static void Dress(NpcController npc, ShopperKind kind)
+        {
+            var look = npc.GetComponent<ShopperLook>();
+            if (look != null) look.Apply(kind, npc.Animation);
         }
 
         private NpcController TakeFromPool(NpcRole role)
@@ -152,6 +216,7 @@ namespace NightSupermarket.Game
             body.AddComponent<NpcPerception>();
             if (role == NpcRole.Customer) { body.AddComponent<CustomerBehavior>(); body.AddComponent<NpcShopping>(); }
             else body.AddComponent<EmployeeBehavior>();
+            body.AddComponent<ShopperLook>();
             var look = body.AddComponent<NpcAnimationHooks>();
             var profile = role == NpcRole.Customer ? CharacterProfile.Customers[seed % CharacterProfile.Customers.Length] : CharacterProfile.Employee;
             look.Dress(profile, role == NpcRole.Customer ? Tints[seed % Tints.Length] : new Color(0.95f, 0.55f, 0.1f));

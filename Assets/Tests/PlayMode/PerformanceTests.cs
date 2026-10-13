@@ -11,7 +11,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 namespace NightSupermarket.Tests
 {
-    /// <summary>Basic budget check at the current hard cap (16 customers). Writes TestResults/performance.txt.</summary>
+    /// <summary>Basic budget check at the hard cap (40 customers, the busiest a night can get). Writes TestResults/performance.txt.</summary>
     public sealed class PerformanceTests
     {
         [UnityTest] public IEnumerator HardCapPopulationStaysWithinBasicBudgets()

@@ -1,8 +1,8 @@
 using System;
 namespace NightSupermarket.Core
 {
-    /// <summary>The four poses a mannequin can hold. Each department expects one of them.</summary>
-    public enum Stance { Neutral, Display, Browsing, Lounging, Staff }
+    /// <summary>Upper-body poses. Neutral and the four selectable ones are the player's (each department expects one); the rest are worn by shoppers and staff (never selectable).</summary>
+    public enum Stance { Neutral, Display, Browsing, Lounging, Staff, Phone, Filming, Pointing, Mopping, Carrying }
 
     public static class PoseLibrary
     {
@@ -16,6 +16,8 @@ namespace NightSupermarket.Core
             ZoneType.Supermarket => Stance.Browsing,
             ZoneType.Home => Stance.Lounging,
             ZoneType.Mezzanine => Stance.Lounging,
+            ZoneType.Atrium => Stance.Lounging,
+            ZoneType.ToyStore => Stance.Display,
             ZoneType.Checkout => Stance.Staff,
             ZoneType.CustomerService => Stance.Staff,
             ZoneType.Employee => Stance.Staff,
@@ -34,9 +36,9 @@ namespace NightSupermarket.Core
 
         public static string Hint(Stance pose) => pose switch
         {
-            Stance.Display => "arms out, chin up — Clothing",
+            Stance.Display => "arms out, chin up — Clothing, Toy store",
             Stance.Browsing => "hand on a shelf — Aisles, Electronics",
-            Stance.Lounging => "leaning, relaxed — Home, Upstairs",
+            Stance.Lounging => "leaning, relaxed — Home, Upstairs, Atrium",
             Stance.Staff => "hands behind the back — Checkout, Staff rooms",
             _ => "just standing"
         };

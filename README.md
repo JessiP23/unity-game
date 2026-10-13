@@ -30,6 +30,22 @@ and an outfit that fits the department you stand in buys the same doubt a pose d
 a second floor: the escalator by Clothing climbs to the Home & Electronics gallery, and when the front
 shutter drops at lockdown the fire exit up there is the only way out.
 
+The supermarket sits in a small night mall: the front doors open onto an atrium (fountain, benches,
+two security cameras — don't move in the red light) and the toy store beyond it, where the carousel
+turns: ride it in the Display pose and nobody counts you as moving. The escalator carries you up (and
+that counts as moving); the stairs beside it let you stop. The escape door is beside the mall doors.
+
+Before each night, clock in: Relaxed, Normal or Rush hour (unlocks after three nights; busier pays more).
+Walk WITH a group of shoppers and they hide you; running gives you away. People gather at your jobs, but
+every job goes quiet for 15 s about once a minute — the job card under NEXT counts it down. Watch for
+kids (they point), the influencer's red camera light, and cleaners' wet floors (don't run on them).
+The mall gets busier the more nights you play, and twice a night a FLASH SALE floods one department —
+usually one your jobs are in. Watch the countdown under the clock and plan around the crowd.
+Every night has a dare (Tab, Night page) worth points and a gem; do the daily shift's dare on
+consecutive days to build a streak. Toss a coin in the fountain for the night's wish (the splash
+brings the guard). Any Clothing rack or table lends you clothes (E). Get caught and you go down like a
+plank; selfies, planks and escapes are saved as photos to Pictures/Night Mall.
+
 The end card shows the shift's leaderboard; TAB there edits your name. Scores stay on this
 computer unless you run `python3 Tools/leaderboard_server.py` somewhere your friends can reach
 and paste its address into *Night Supermarket ▸ Leaderboard ▸ Settings…*. Online co-op is

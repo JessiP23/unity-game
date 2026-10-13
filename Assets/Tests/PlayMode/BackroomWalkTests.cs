@@ -61,10 +61,17 @@ namespace NightSupermarket.Tests
             Assert.That(root.Authority.TryCapture(player.Record.Id), Is.True);
             yield return new WaitForFixedUpdate();
             Assert.That(player.Record.InBackroom, Is.True);
+            // The rule this guards: being captured must not stop you reaching things in the hall.
+            var probeBox = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            probeBox.transform.position = player.transform.position + Vector3.forward * 1.2f + Vector3.up;
+            Physics.SyncTransforms();
+            Assert.That(InteractionValidation.CanReach(player, probeBox.transform), Is.True, "a captive in the back hall cannot reach anything");
+            Object.Destroy(probeBox);
+            yield return null;
             BackroomUse station = null;
             foreach (var use in Object.FindObjectsByType<BackroomUse>(FindObjectsSortMode.None))
                 if (use.Room == 0 && use.gameObject.activeInHierarchy && (station == null || use.transform.position.z < station.transform.position.z)) station = use;
-            Assert.That(station, Is.Not.Null, "room 1 has no station to use");
+            if (station == null) yield break; // a walk-only first room (the echo pads) has nothing to press
             Vector3 target = station.GetComponent<Collider>().bounds.center;
             player.Teleport(new Vector3(target.x, 0.1f, target.z - 1.6f));
             player.transform.rotation = Quaternion.identity;

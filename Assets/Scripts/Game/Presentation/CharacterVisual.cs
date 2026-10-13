@@ -51,9 +51,23 @@ namespace NightSupermarket.Game
             // Lounging: arms folded across the chest, leaning back.
             new StancePose(new Vector3(-0.25f, -0.75f, 0.45f), new Vector3(0.25f, -0.75f, 0.45f), new Vector3(1f, 0.05f, 0.25f), new Vector3(-1f, 0.05f, 0.25f), -5f, -10f),
             // Staff: hands clasped behind the back, upright.
-            new StancePose(new Vector3(-0.2f, -0.9f, -0.4f), new Vector3(0.2f, -0.9f, -0.4f), new Vector3(1f, 0.1f, -0.2f), new Vector3(-1f, 0.1f, -0.2f), 0f, 3f)
+            new StancePose(new Vector3(-0.2f, -0.9f, -0.4f), new Vector3(0.2f, -0.9f, -0.4f), new Vector3(1f, 0.1f, -0.2f), new Vector3(-1f, 0.1f, -0.2f), 0f, 3f),
+            // Phone: right hand up in front of the chest, head bowed over the screen.
+            new StancePose(new Vector3(-0.1f, -1f, 0.05f), new Vector3(0.12f, -0.85f, 0.4f), new Vector3(-0.05f, -1f, 0.1f), new Vector3(-0.3f, 0.5f, 0.8f), 28f, 6f),
+            // Filming: phone held out at eye height, sweeping the room.
+            new StancePose(new Vector3(-0.1f, -1f, 0.05f), new Vector3(0.15f, 0.08f, 1f), new Vector3(-0.05f, -1f, 0.1f), new Vector3(0f, 0.18f, 1f), -2f, -2f),
+            // Pointing: a kid's arm straight out at what they saw.
+            new StancePose(new Vector3(-0.1f, -1f, 0.05f), new Vector3(0.1f, 0.35f, 1f), new Vector3(-0.05f, -1f, 0.1f), new Vector3(0.05f, 0.4f, 1f), -10f, -4f),
+            // Mopping: both hands low and forward on the handle, looking at the floor.
+            new StancePose(new Vector3(0.05f, -0.6f, 0.8f), new Vector3(0.15f, -0.7f, 0.7f), new Vector3(0.1f, -0.5f, 0.85f), new Vector3(-0.05f, -0.6f, 0.8f), 16f, 8f),
+            // Carrying: a box held out in front at waist height.
+            new StancePose(new Vector3(-0.15f, -0.4f, 0.9f), new Vector3(0.15f, -0.4f, 0.9f), new Vector3(0.2f, 0.05f, 1f), new Vector3(-0.2f, 0.05f, 1f), 4f, -3f)
         };
         private Transform handL, handR;
+        /// <summary>Bones props hang from (null on rigs without Biped names).</summary>
+        public Transform HandRight => handR;
+        public Transform HandLeft => handL;
+        public Transform HeadBone => head;
 
         public static CharacterVisual Attach(Transform host, CharacterProfile profile)
         {
@@ -186,6 +200,38 @@ namespace NightSupermarket.Game
             bone.rotation = Quaternion.AngleAxis(degrees * stanceWeight, host.right) * bone.rotation;
         }
 
+        private int detail = -1;
+
+        /// <summary>
+        /// Crowd level of detail for shoppers and staff (never the player): 0 near, 1 mid, 2 far. Only near bodies
+        /// cast shadows; mid and far ones skin with two bones. Off screen, nobody's skeleton or skin is updated:
+        /// a fixed, generous box stands in for the body when culling (the hips are pinned, so the body never leaves it).
+        /// </summary>
+        public void SetDetail(int level)
+        {
+            if (renderers == null || level == detail) return;
+            if (detail < 0)
+            {
+                var animator = GetComponent<Animator>();
+                if (animator != null) animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+                foreach (var renderer in renderers)
+                    if (renderer is SkinnedMeshRenderer skinned)
+                    {
+                        skinned.updateWhenOffscreen = false;
+                        skinned.localBounds = new Bounds(Vector3.zero, Vector3.one * 3.6f);
+                    }
+            }
+            detail = level;
+            var shadows = level == 0 ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null) continue;
+                renderer.shadowCastingMode = shadows;
+                if (renderer is SkinnedMeshRenderer skinned) skinned.quality = level == 0 ? SkinQuality.Auto : SkinQuality.Bone2;
+            }
+            if (garment != null) garment.shadowCastingMode = shadows;
+        }
+
         /// <summary>Hides the body from its owner's camera while keeping its shadow.</summary>
         public void SetFirstPerson(bool firstPerson)
         {
@@ -312,6 +358,32 @@ namespace NightSupermarket.Game
                 hips.position = transform.TransformPoint(local);
             }
             PlaceGarment();
+            ApplyTopple(Time.deltaTime);
+        }
+
+        private float topple, toppleTarget, toppleVelocity;
+        /// <summary>True while the body is falling or lying flat.</summary>
+        public bool Toppled => toppleTarget > 0.5f;
+        /// <summary>Falls over stiff as a plank (true) or stands back up (false). Pivots at the feet, with one small bounce.</summary>
+        public void Topple(bool down)
+        {
+            if (down && toppleTarget <= 0f && topple <= 0f) toppleRest = transform.localRotation;
+            toppleTarget = down ? 1f : 0f;
+            if (!down) { topple = 0f; toppleVelocity = 0f; transform.localRotation = toppleRest; }
+        }
+        private Quaternion toppleRest = Quaternion.identity;
+
+        private void ApplyTopple(float delta)
+        {
+            if (toppleTarget <= 0f && topple <= 0f) return;
+            if (toppleTarget >= 1f && topple >= 1f && toppleVelocity == 0f) return; // lying flat, at rest
+            // A stiff body accelerates as it tips (gravity on a plank), hits the floor, bounces once.
+            toppleVelocity += (toppleTarget >= topple ? 9f : -9f) * delta * (0.4f + topple);
+            topple += toppleVelocity * delta;
+            if (topple >= 1f) { topple = 1f; toppleVelocity = -toppleVelocity * 0.25f; if (Mathf.Abs(toppleVelocity) < 0.15f) toppleVelocity = 0f; }
+            if (topple <= 0f && toppleTarget <= 0f) { topple = 0f; toppleVelocity = 0f; }
+            // Rotate about the body's own left-right axis (in the parent's space), so any import rotation survives.
+            transform.localRotation = Quaternion.AngleAxis(-90f * topple, Vector3.right) * toppleRest;
         }
 
         private void OnDestroy()

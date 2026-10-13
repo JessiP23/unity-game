@@ -38,6 +38,7 @@ namespace NightSupermarket.Game
             awareness = settings; interval = Mathf.Max(0.02f, sampleInterval);
             clock = phase * interval;
             trackers.Clear(); Focus = null;
+            CrowdBlind = 1f;
         }
 
         /// <summary>Called by the controller on the state authority only.</summary>
@@ -71,7 +72,7 @@ namespace NightSupermarket.Game
                 if (target.Noticeable && (target.transform.position - transform.position).sqrMagnitude <= reach * reach)
                     visible = sensor.CanSee(eye, forward, target.AimPoint, target.transform).Visible;
                 Vector3 p = target.transform.position;
-                if (tracker.Tick(visible, target.Speed, new MapPoint(p.x, p.y, p.z), elapsed)) ReportReady?.Invoke(target, tracker);
+                if (tracker.Tick(visible, target.Speed, new MapPoint(p.x, p.y, p.z), elapsed, Concealment(target))) ReportReady?.Invoke(target, tracker);
                 double weight = (int)tracker.State * 10 + tracker.Suspicion;
                 if (tracker.State != AwarenessState.Unaware && weight > strongest) { strongest = weight; Focus = target; }
             }
@@ -80,6 +81,10 @@ namespace NightSupermarket.Game
             foreach (var target in trackers.Keys) if (target == null || !target.isActiveAndEnabled) stale.Add(target);
             foreach (var target in stale) trackers.Remove(target);
         }
+
+        /// <summary>How much of what this NPC sees the crowd hides. Zero for anyone who sees right through crowds (an influencer filming).</summary>
+        public float CrowdBlind { get; set; } = 1f;
+        private float Concealment(PerceptionTarget target) => target.Concealment * CrowdBlind;
 
         private void OnChanged(PerceptionTarget target, AwarenessTracker tracker, AwarenessState state)
         {

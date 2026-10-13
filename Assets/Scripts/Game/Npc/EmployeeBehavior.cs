@@ -19,6 +19,10 @@ namespace NightSupermarket.Game
         public override byte StateCode => (byte)state;
         public override string StateLabel(byte code) => ((EmployeeState)code).ToString();
 
+        /// <summary>Which of tonight's jobs a cleaner or restocker heads to next (-1: ordinary work); null for ordinary staff.</summary>
+        public System.Func<int> Errand { get; set; }
+        /// <summary>Started work at a spot (a cleaner leaves a wet floor here).</summary>
+        public event System.Action<EmployeeBehavior> StartedWork;
         public void Begin(Random rng) { random = rng; NextSpot(); }
 
         public override void Tick(float delta)
@@ -28,7 +32,7 @@ namespace NightSupermarket.Game
             switch (state)
             {
                 case EmployeeState.Walking:
-                    if (Movement.Arrived) { state = EmployeeState.Working; Movement.Stop(); timer = Range(workSeconds); }
+                    if (Movement.Arrived) { state = EmployeeState.Working; Movement.Stop(); timer = Errand != null ? 18f + (float)random.NextDouble() * 6f : Range(workSeconds); StartedWork?.Invoke(this); }
                     else if (Movement.Stuck || Movement.Unreachable) NextSpot();
                     break;
                 case EmployeeState.Working:
@@ -44,7 +48,9 @@ namespace NightSupermarket.Game
         private void NextSpot()
         {
             state = EmployeeState.Walking;
-            var spot = Navigation.ChooseWork();
+            NavigationPoint spot = null;
+            if (Errand != null) { int job = Errand(); if (job >= 0) spot = Navigation.ChooseLinger(job); }
+            if (spot == null) spot = Navigation.ChooseWork();
             if (spot == null || !Movement.GoTo(spot.Position)) { state = EmployeeState.Working; timer = 3; }
         }
 

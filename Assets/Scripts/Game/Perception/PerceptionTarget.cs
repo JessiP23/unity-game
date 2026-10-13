@@ -22,6 +22,8 @@ namespace NightSupermarket.Game
         private const float MemorySeconds = 0.3f;
         private float lastMoving = float.NegativeInfinity, lastMovingSpeed;
         public Vector3 AimPoint => transform.position + Vector3.up * aimHeight;
+        /// <summary>Share of a watcher's suspicion the surrounding crowd absorbs (0–0.75), set by <see cref="CrowdCover"/>.</summary>
+        public float Concealment { get; set; }
         private PlayerMotor motor;
         private void Awake() => motor = GetComponent<PlayerMotor>();
         private void FixedUpdate()

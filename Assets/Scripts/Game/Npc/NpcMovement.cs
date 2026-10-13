@@ -17,6 +17,7 @@ namespace NightSupermarket.Game
         private Vector3 requested;
         public NavMeshAgent Agent => agent;
         public float Speed => agent != null && agent.enabled ? agent.velocity.magnitude : 0f;
+        public Vector3 Velocity => agent != null && agent.enabled ? agent.velocity : Vector3.zero;
         public bool HasDestination { get; private set; }
         public bool Stuck { get; private set; }
 
@@ -40,6 +41,8 @@ namespace NightSupermarket.Game
             if (agent != null) agent.enabled = simulated;
         }
 
+        /// <summary>Crowd level of detail: careful avoidance near the camera, cheap avoidance far away.</summary>
+        public void SetAvoidance(ObstacleAvoidanceType quality) { if (agent != null && agent.obstacleAvoidanceType != quality) agent.obstacleAvoidanceType = quality; }
         public void SetPace(float multiplier) { if (agent != null) agent.speed = baseSpeed * multiplier; }
 
         public bool GoTo(Vector3 destination)

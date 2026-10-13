@@ -12,13 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac490f0d5c7724eb691d764995bb41ae, type: 3}
   m_Name: NpcPopulation
   m_EditorClassIdentifier: 
-  minimumCustomers: 6
-  maximumCustomers: 12
-  maxActiveCustomers: 16
-  initialCustomers: 7
-  spawnInterval: 6
+  minimumCustomers: 10
+  maximumCustomers: 20
+  maxActiveCustomers: 40
+  startingBudget: 30
+  budgetFloor: 16
+  initialCustomers: 12
+  spawnInterval: 4
   crowdCycleSeconds: 180
-  employees: 2
+  employees: 3
   employeeWalkSpeed: {x: 1.25, y: 1.45}
   employeeWorkSeconds: {x: 6, y: 14}
   employeeVisionRange: 9

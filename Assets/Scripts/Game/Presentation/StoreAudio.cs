@@ -9,7 +9,7 @@ namespace NightSupermarket.Game
     public sealed class StoreAudio : MonoBehaviour
     {
         private const int Rate = 22050;
-        private static AudioClip stepClip, chimeClip, askClip, chaseClip, catchClip, whistleClip, heartClip, exhaleClip, clunkClip, shutterClip, gemClip;
+        private static AudioClip stepClip, chimeClip, askClip, chaseClip, catchClip, whistleClip, heartClip, exhaleClip, clunkClip, shutterClip, gemClip, splashClip, announceClip;
         private AudioSource steps, chime, radio, heart;
         private float nextBeat;
         private System.IDisposable cueSubscription;
@@ -202,7 +202,29 @@ namespace NightSupermarket.Game
             if (clunkClip == null) clunkClip = Clunk();
             if (shutterClip == null) shutterClip = ShutterRoll();
             if (gemClip == null) gemClip = GemChime();
+            if (splashClip == null) splashClip = SplashBurst();
+            if (announceClip == null) announceClip = Announcement();
         }
+
+        /// <summary>Something hitting water: a low plop and a spray of noise that dies away.</summary>
+        private static AudioClip SplashBurst()
+        {
+            int count = (int)(Rate * 0.6f);
+            var data = new float[count];
+            var rng = new System.Random(21);
+            float smooth = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                float time = i / (float)Rate;
+                float white = (float)(rng.NextDouble() * 2 - 1);
+                smooth += (white - smooth) * 0.35f;
+                float plop = Mathf.Sin(i * Mathf.Lerp(420f, 140f, time / 0.12f) * Mathf.PI * 2f / Rate) * Mathf.Exp(-time * 30f) * 0.5f;
+                data[i] = plop + smooth * Mathf.Exp(-time * 7f) * 0.45f;
+            }
+            return Clip("Splash", data);
+        }
+
+        public void Splash(float volume = 0.7f) { if (chime != null && splashClip != null) chime.PlayOneShot(splashClip, volume); }
 
         /// <summary>A bank of fluorescent tubes switching off: a relay clunk and a fading hum.</summary>
         private static AudioClip Clunk()
@@ -325,6 +347,30 @@ namespace NightSupermarket.Game
             }
             return Clip("Job chime", data);
         }
+
+        /// <summary>The mall's PA: a soft three-note "ding-ding-dong" before an announcement.</summary>
+        private static AudioClip Announcement()
+        {
+            float[] notes = { 659f, 830f, 554f };
+            int count = (int)(Rate * 1.5f);
+            var data = new float[count];
+            for (int n = 0; n < notes.Length; n++)
+            {
+                int start = (int)(Rate * 0.32f * n);
+                float phase = 0;
+                for (int i = start; i < count; i++)
+                {
+                    float local = (i - start) / (float)Rate;
+                    float envelope = Mathf.Clamp01(local / 0.02f) * Mathf.Exp(-local * 3.2f);
+                    // A little second harmonic makes it sound like a bell, not a beep.
+                    data[i] += (Mathf.Sin(phase) + 0.25f * Mathf.Sin(phase * 2f)) * envelope * 0.28f;
+                    phase += notes[n] * Mathf.PI * 2f / Rate;
+                }
+            }
+            return Clip("PA announcement", data);
+        }
+
+        public void Announce() { if (chime != null && announceClip != null) chime.PlayOneShot(announceClip, 0.8f); }
 
         private static AudioClip Ask()
         {

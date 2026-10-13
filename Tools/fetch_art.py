@@ -46,6 +46,8 @@ PROPS = [
     'mantel_clock_01', 'desk_lamp_arm_01', 'throw_pillows_01', 'Ottoman_01', 'dining_chair_02',
     # Clothing department
     'rubber_boots', 'fishermans_hat', 'wicker_basket_02',
+    # Mall: carousel horses, atrium plants, the ducks in the fountain
+    'horse_statue_01', 'potted_plant_01', 'potted_plant_02', 'rubber_duck_toy',
 ]
 SURFACES = {
     'tiled_floor_001': '2k', 'smooth_concrete_floor': '1k', 'white_plaster_02': '1k',
@@ -53,6 +55,7 @@ SURFACES = {
 'brushed_concrete': '1k', 'wood_table_001': '1k',
     'rusty_metal_shutter': '1k', 'concrete_wall_004': '1k',
     'cotton_jersey': '1k', 'rough_linen': '1k', 'ribbed_corduroy': '1k', 'wool_boucle': '1k',
+    'marble_01': '1k',
 }
 AVATARS = {
     'Guard': 'Avatars/Professions/Security_Male_01',

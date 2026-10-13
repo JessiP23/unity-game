@@ -9,6 +9,17 @@ namespace NightSupermarket.Game
         private const string Accent = "#FFD54A";
         private static readonly System.Text.StringBuilder Builder = new System.Text.StringBuilder(512);
 
+        /// <summary>The store map's name for a department (the map calls the supermarket floor "Aisles").</summary>
+        public static string MapZone(ZoneType zone) => zone switch
+        {
+            ZoneType.Supermarket => "Aisles",
+            ZoneType.ToyStore => "Toy store",
+            ZoneType.Mezzanine => "Home & Electronics",
+            ZoneType.EntranceExit => "Entrance",
+            ZoneType.Employee => "Staff",
+            _ => zone.ToString()
+        };
+
         public static string ZoneLabel(ZoneType? zone) => zone switch
         {
             ZoneType.EntranceExit => "Entrance",
@@ -22,6 +33,8 @@ namespace NightSupermarket.Game
             ZoneType.Employee => "the staff room",
             ZoneType.Security => "Security",
             ZoneType.Mezzanine => "Upstairs",
+            ZoneType.Atrium => "the atrium",
+            ZoneType.ToyStore => "the toy store",
             _ => "the store"
         };
 
@@ -30,13 +43,14 @@ namespace NightSupermarket.Game
             "shirt" => "Shirt",
             "employee-key" => "Employee key",
             "debug-crate" => "Crate",
+            "robot" => "Toy robot",
             _ => string.IsNullOrEmpty(id) ? "Item" : id.Replace('-', ' ')
         };
 
         public static string ReportLine(SuspiciousActivityEvent report)
         {
             string who = report.SourceId != null && report.SourceId.IndexOf("Employee", System.StringComparison.OrdinalIgnoreCase) >= 0
-                ? "A staff member" : "A shopper";
+                ? "A staff member" : report.SourceId != null && report.SourceId.StartsWith("Camera") ? "A security camera" : "A shopper";
             return who + " reported movement near " + ZoneLabel(report.Zone);
         }
 

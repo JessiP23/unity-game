@@ -52,6 +52,15 @@ namespace NightSupermarket.Game
         private bool testingKeys;
         private StoreDirectory directory;
         private CustomerPopulationManager population;
+        private CrowdDirector crowd;
+        public CrowdDirector Crowd => crowd;
+        /// <summary>The shift the player clocked in for (Relaxed, Normal, Rush hour). Test runs are always Normal.</summary>
+        private Difficulty difficulty = Difficulty.Normal;
+        public Difficulty Difficulty => difficulty;
+        private ShiftCard shiftCard;
+        private bool choosingShift;
+        private readonly CrowdMetrics metrics = new CrowdMetrics();
+        private float metricsTimer;
         private NpcDebugOverlay npcDebug;
         private INetworkService network = new LocalNetworkService();
         private FusionSession fusion;
@@ -154,7 +163,11 @@ namespace NightSupermarket.Game
             authority.Flow.Changed += OnPhaseChanged;
             layout = new System.Random(shift * 7919 + 17);
             bestBefore = PlayerPrefs.GetInt("ns-best-" + shift, 0);
+            SetUpDare();
             tutorial = PlayerPrefs.GetInt("ns-nights", 0) < 2 && !testRun;
+            difficulty = testRun ? Difficulty.Normal : DifficultyRules.Parse(PlayerPrefs.GetInt("ns-difficulty", 1));
+            if (!DifficultyRules.Unlocked(difficulty, PlayerPrefs.GetInt("ns-nights", 0))) difficulty = Difficulty.Normal;
+            score.DifficultyFactor = DifficultyRules.ScoreFactor(difficulty);
             backroom = gameObject.AddComponent<BackroomPocket>();
             backroom.Configure(authority, rules.mannequinPlayers > 1);
             backroom.Cleared += OnBackroomCleared;
@@ -166,7 +179,7 @@ namespace NightSupermarket.Game
                 pawns.Add(CreatePawn(session, new Vector3(-5.4f + (i % 4) * 0.9f, 0.1f, 12.4f - (i / 4) * 0.8f)));
             wardrobe = testRun ? new WardrobeState() : WardrobeState.Parse(PlayerPrefs.GetString(WardrobeKey, ""));
             menuOutfit = wardrobe.Worn;
-            foreach (var pawn in pawns) pawn.Visual?.SetOutfit(wardrobe.Worn);
+            foreach (var pawn in pawns) Dress(pawn);
             jobs = new JobBuilder(transform, authority, signals, rules, shift, layout, Solo)
             {
                 Unwatched = Unwatched,
@@ -202,11 +215,25 @@ namespace NightSupermarket.Game
                 pawn.Pose.Configure(pawn.Motor, pawn.Detection.Detection);
                 pawn.Mannequin.Configure(pawn.Motor, directory);
             }
-            StoreDressing.Apply(transform, authority.Lighting.Mode);
+            StoreDressing.Apply(transform, authority.Lighting.Mode, signals);
             jobs.AfterDressing();
             population = gameObject.AddComponent<CustomerPopulationManager>();
-            population.Configure(directory, NpcPopulationSettings.Load(), authority.TryReport, () => Time.timeAsDouble, network.IsAuthority, shift == 0 ? Environment.TickCount : shift);
+            // Real nights shop the whole mall; test runs keep the classic four departments their scenarios script.
+            if (!testRun) population.Catalog = ShoppingCatalog.Mall;
+            population.Configure(directory, NpcPopulationSettings.Load(), report => Time.time >= hushUntil && authority.TryReport(report), () => Time.timeAsDouble, network.IsAuthority, shift == 0 ? Environment.TickCount : shift);
+            // The mall gets busier as the player gets better; flash sales flood the departments tonight's jobs are in.
+            crowd = gameObject.AddComponent<CrowdDirector>();
+            crowd.Configure(population, directory, population.Catalog, shift, testRun ? 0 : CrowdPlan.Level(PlayerPrefs.GetInt("ns-nights", 0)),
+                () => authority.Clock.Remaining, rules.matchDuration, JobSpots(), Toast, (title, detail) => ShowBanner(title, detail, 2.8f, false),
+                governBudget: !testRun && !Application.isBatchMode, withSales: !testRun);
+            // Crowds at the jobs, families, phone zombies, the influencer and the cleaning crew: real nights only
+            // (scripted tests turn them on when they are about them).
+            crowd.JobSites = FillJobSites;
+            crowd.PressureEnabled = !testRun;
+            crowd.EnableKinds(!testRun);
+            crowd.SetDifficulty(testRun ? Difficulty.Normal : difficulty);
             population.Populate();
+            foreach (var pawn in pawns) pawn.Cover = CrowdCover.Attach(pawn.Motor, population);
             var debugHost = new GameObject("NPC debug");
             debugHost.transform.SetParent(transform, false);
             npcDebug = debugHost.AddComponent<NpcDebugOverlay>();
@@ -219,15 +246,69 @@ namespace NightSupermarket.Game
             storeAudio.BindGuard(guardController);
             storeAudio.Watch(missions);
             storeAudio.Listen(authority.Audio);
+            crowd.Audio = storeAudio;
+            WetFloor.Signals = signals;
+            WetFloor.Players = () => motors;
+            WetFloor.Said = text => Toast(text, 2.5f);
+            crowd.Viral = OnViral;
             if (StoreLighting.Active != null) StoreLighting.Active.BankOff = _ => storeAudio.LightsClunk();
             guideBeacon = GuideBeacon.Create(transform);
+            badge = InteractBadge.Create(transform);
+            photos = PhotoBooth.Create(transform, hud != null ? hud.Canvas : null);
+            photos.Enabled = !testRun;
+            WireFittingRooms();
+            WireFountain();
+            dressedHook = m => PawnOf(m)?.Borrowed.HasValue ?? false;
+            DisplayCamouflage.Dressed = dressedHook;
             reactions = gameObject.AddComponent<ShopperReactions>();
             reactions.Configure(population, () => motors, StillFor, m => PawnOf(m)?.Mannequin.Holding ?? false, OnAdmired, storeAudio, shift * 13 + 5);
+            // Two cameras sweep the atrium: the rule they teach is one line, "don't move in the red light".
+            SecurityCamera.Create(transform, "1", new Vector3(-11.3f, 5.6f, -16.3f), new Vector3(-1f, 0f, -24f), () => motors, CameraReport, CameraFirstSeen, new Vector3(-11.75f, 5.6f, -16.3f));
+            SecurityCamera.Create(transform, "2", new Vector3(11.3f, 5.6f, -31.7f), new Vector3(1f, 0f, -24f), () => motors, CameraReport, CameraFirstSeen, new Vector3(11.75f, 5.6f, -31.7f));
             gadgets = gameObject.AddComponent<GadgetKit>();
             gadgets.Configure(transform, signals, authority, careerBefore, text => Toast(text, 3.5f));
             board = gameObject.AddComponent<LeaderboardStore>();
             board.Refresh(shift);
             SetActive(0);
+            if (!testRun && network.IsAuthority && hud != null && hud.Canvas != null)
+            {
+                // Clock in first: the night waits, frozen, until the player picks a shift.
+                shiftCard = ShiftCard.Create(hud.Canvas);
+                shiftCard.Confirmed = ClockIn;
+                choosingShift = true;
+                foreach (var pawn in pawns) pawn.Input.Active = false; // keys on the card never reach the mannequin
+                Time.timeScale = 0f;
+                authority.Clock.Paused = true;
+                Cursor.lockState = CursorLockMode.None;
+                shiftCard.Show("Shift #" + shift + "  ·  Guard: " + guardProfile.Name + " (" + guardProfile.Trait + ")  ·  Crowd: " + CrowdPlan.LevelName(crowd.Level)
+                    + "  ·  Dare: " + NightDare.Title(dare), difficulty, PlayerPrefs.GetInt("ns-nights", 0));
+                return;
+            }
+            StartNight();
+        }
+
+        /// <summary>The shift card closed: apply the choice and let the night run.</summary>
+        private void ClockIn()
+        {
+            if (!choosingShift) return;
+            choosingShift = false;
+            difficulty = shiftCard.Choice;
+            shiftCard.Hide();
+            PlayerPrefs.SetInt("ns-difficulty", (int)difficulty);
+            PlayerPrefs.Save();
+            score.DifficultyFactor = DifficultyRules.ScoreFactor(difficulty);
+            crowd.SetDifficulty(difficulty);
+            metrics.Difficulty = difficulty;
+            help = false; timeScaleBeforeMenu = 1f; clockPausedBeforeMenu = false;
+            Time.timeScale = 1f;
+            authority.Clock.Paused = false;
+            SetActive(active); // hands input back to whoever is being played
+            for (int i = 0; i < pawns.Count; i++) pawns[i].Input.Consume();
+            StartNight();
+        }
+
+        private void StartNight()
+        {
             Cursor.lockState = CursorLockMode.Locked;
             if (tutorial) Tip("start", "Move with WASD. When the guard or a shopper looks your way, STOP.", 7f);
             else
@@ -236,8 +317,79 @@ namespace NightSupermarket.Game
                 string target = top.Count > 0 && !string.Equals(top[0].Name, board.PlayerName, StringComparison.OrdinalIgnoreCase)
                     ? "  ·  " + top[0].Name + " holds " + top[0].Points.ToString("N0")
                     : bestBefore > 0 ? "  ·  best " + bestBefore.ToString("N0") : "";
-                Toast("Shift #" + shift + "  ·  Guard: " + guardProfile.Name + ", " + guardProfile.Trait + target, 5f);
+                Toast("Shift #" + shift + "  ·  " + DifficultyRules.Name(difficulty) + "  ·  Guard: " + guardProfile.Name + ", " + guardProfile.Trait + target + "  ·  Crowd: " + CrowdPlan.LevelName(crowd.Level)
+                    + "\nDare: " + NightDare.Title(dare) + " — " + NightDare.Describe(dare) + "\nWalk WITH a group of shoppers and they hide you. Running gives you away.", 7f);
             }
+        }
+
+        /// <summary>Night metrics: once a second, the crowd and the frame rate; every frame, time spent near unfinished jobs.</summary>
+        private void TrackCrowdMetrics()
+        {
+            if (crowd == null || authority.Flow.Phase != MatchPhase.Night || authority.Clock.Paused) return;
+            var me = Player;
+            if (me != null && me.Record != null && me.Record.Free) crowd.TrackWait(me.transform.position, Time.deltaTime);
+            metricsTimer -= Time.unscaledDeltaTime;
+            if (metricsTimer > 0) return;
+            metricsTimer = 1f;
+            metrics.Sample(population.Customers, population.Cap, Time.smoothDeltaTime * 1000.0);
+        }
+
+        /// <summary>
+        /// Appends tonight's crowd numbers to crowd-metrics.csv (next to the game's saved data), so the crowd can be
+        /// tuned against real nights: waits per job, reports per minute, jobs finished, by difficulty and level.
+        /// </summary>
+        private void WriteCrowdMetrics(bool victory)
+        {
+            if (testRun || crowd == null) return;
+            metrics.Level = crowd.Level; metrics.Difficulty = difficulty;
+            metrics.Reports = authority.Stats.Reports; metrics.InfluencerReports = crowd.InfluencerClips;
+            metrics.NightSeconds = rules.matchDuration - Math.Max(0, authority.Clock.Remaining);
+            metrics.JobsTotal = missions != null ? missions.Missions.Count : 0;
+            metrics.JobsDone = 0;
+            if (missions != null) foreach (var m in missions.Missions) if (m.Complete) metrics.JobsDone++;
+            metrics.CoveredSeconds = 0;
+            foreach (var pawn in pawns) if (pawn.Cover != null) metrics.CoveredSeconds += pawn.Cover.CoveredSeconds;
+            metrics.WaitSeconds = new double[metrics.JobsTotal];
+            for (int i = 0; i < metrics.JobsTotal; i++) metrics.WaitSeconds[i] = crowd.WaitSeconds.TryGetValue(i, out var w) ? w : 0;
+            try
+            {
+                string file = System.IO.Path.Combine(Application.persistentDataPath, "crowd-metrics.csv");
+                bool fresh = !System.IO.File.Exists(file);
+                System.IO.File.AppendAllText(file, (fresh ? CrowdMetrics.Header + "\n" : "") + metrics.Row(DateTime.Now.ToString("yyyy-MM-dd HH:mm"), shift, victory) + "\n");
+            }
+            catch (Exception error) { Debug.LogWarning("[CROWD] could not write metrics: " + error.Message); }
+        }
+
+        /// <summary>Tonight's jobs for the crowd: where the player has to be for each, and whether it is done.</summary>
+        private void FillJobSites(List<JobSite> into)
+        {
+            if (missions == null || jobs == null || pawns.Count == 0) return;
+            var motor = Player ?? pawns[0].Motor;
+            for (int i = 0; i < missions.Missions.Count; i++)
+            {
+                var job = missions.Missions[i];
+                bool known = jobs.Guide(job, motor, out var at, out _);
+                into.Add(new JobSite(i, job.Complete || job.Failed, known, at));
+            }
+        }
+
+        /// <summary>An influencer filmed a mannequin moving: a funny moment, a photo, and a report the guard acts on.</summary>
+        private void OnViral(CustomerBehavior who)
+        {
+            string[] captions = { "\"THE MANNEQUIN MOVED\" — 12k views and climbing", "\"tell me why the mannequin just WALKED\" — trending in the mall", "\"mall mannequins are alive?? part 1\" — 48k likes" };
+            Toast("You went viral! " + captions[viralCount++ % captions.Length] + "\nThe guard has seen the clip.", 5f);
+            if (photos != null) photos.Snap("viral", 0.1f);
+        }
+        private int viralCount;
+
+        /// <summary>Where tonight's jobs send the player, for choosing flash-sale departments.</summary>
+        private List<Vector3> JobSpots()
+        {
+            var spots = new List<Vector3>();
+            if (missions == null || jobs == null || pawns.Count == 0) return spots;
+            foreach (var job in missions.Missions)
+                if (jobs.Guide(job, pawns[0].Motor, out var at, out _)) spots.Add(at);
+            return spots;
         }
 
         /// <summary>Days since the game's epoch: everyone who plays today gets the same store.</summary>
@@ -255,11 +407,12 @@ namespace NightSupermarket.Game
         {
             Vector3[][] routes =
             {
-                new[] { new Vector3(3, 0, -8), new Vector3(10, 0, 0), new Vector3(3, 0, 8), new Vector3(-10, 0, 0) },
-                new[] { new Vector3(-10, 0, -8), new Vector3(3, 0, -8), new Vector3(6, 0, 3), new Vector3(3, 0, 8), new Vector3(-6, 0, 3) },
-                new[] { new Vector3(10, 0, -5), new Vector3(3, 0, 8), new Vector3(-10, 0, 0), new Vector3(-3, 0, -3) },
+                new[] { new Vector3(3, 0, -8), new Vector3(10, 0, 0), new Vector3(3.6f, 0, 8), new Vector3(-10, 0, 0) },
+                new[] { new Vector3(-10, 0, -8), new Vector3(3, 0, -8), new Vector3(6, 0, 3), new Vector3(3.6f, 0, 8), new Vector3(-6, 0, 3) },
+                new[] { // One guard also checks the atrium: the cameras are not the only eyes out there.
+                new Vector3(10, 0, -5), new Vector3(3.6f, 0, 8), new Vector3(-10, 0, 0), new Vector3(-3, 0, -3), new Vector3(0, 0, -21) },
                 // One guard takes the escalator: from upstairs the whole floor is in view, and so is he.
-                new[] { new Vector3(3, 0, -8), new Vector3(10, 0, 0), new Vector3(9, PrimitiveWorld.UpstairsY, 10), new Vector3(3, PrimitiveWorld.UpstairsY, 12), new Vector3(-6, 0, 3) }
+                new[] { new Vector3(3, 0, -8), new Vector3(10, 0, 0), new Vector3(9, PrimitiveWorld.UpstairsY, 10), new Vector3(5, PrimitiveWorld.UpstairsY, 12), new Vector3(-6, 0, 3) }
             };
             var route = routes[shift == 0 ? 0 : layout.Next(routes.Length)];
             var guard = GameObject.CreatePrimitive(PrimitiveType.Capsule); guard.name = "Guard";
@@ -325,12 +478,48 @@ namespace NightSupermarket.Game
 
         private void OnCaptured(Pawn pawn, int index)
         {
+            if (pawn.Borrowed.HasValue) { pawn.Borrowed = null; Dress(pawn); }
             int moves = pawn.Detection != null ? pawn.Detection.Detection.Suspicion.Value : rules.discoveryThreshold;
             int penalty = score.Add(ScoreEvent.Capture);
             score.BreakStreak();
-            // The hall is entered at once (rules and tests see the state change now); the player sees a card first.
-            backroom.Admit(pawn.Motor, authority.Stats.Captures * 31 + shift * 7 + index * 17, authority.Stats.Captures);
-            StartCoroutine(CaughtBeat(pawn, index, moves, penalty));
+            int seed = authority.Stats.Captures * 31 + shift * 7 + index * 17, difficulty = authority.Stats.Captures;
+            if (testRun || pawn.Visual == null)
+            {
+                // Tests (and bodies without art) enter the hall at once so the state change is immediate.
+                backroom.Admit(pawn.Motor, seed, difficulty);
+                StartCoroutine(CaughtBeat(pawn, index, moves, penalty));
+                return;
+            }
+            StartCoroutine(Plank(pawn, index, moves, penalty, seed, difficulty));
+        }
+
+        /// <summary>
+        /// The funny part of being caught: the mannequin keels over stiff as a board, thuds, the camera
+        /// swings round to show it and a photo is taken; then off to the back hall. The capture already
+        /// happened in the rules; this is 1.3 s of presentation (a captive still counts toward escape).
+        /// </summary>
+        private IEnumerator Plank(Pawn pawn, int index, int moves, int penalty, int seed, int difficulty)
+        {
+            pawn.Input.Active = false;
+            pawn.Toppling = true;
+            pawn.Visual.Topple(true);
+            ShowBanner("CAUGHT", "Down like a plank. The guard saw you move " + moves + (moves == 1 ? " time" : " times") + ".   " + penalty.ToString("+#;-#;0") + " pts", 2.4f, true);
+            if (index == active) photos?.Snap("Caught! Down like a plank", 0.55f);
+            yield return new WaitForSeconds(0.42f);
+            storeAudio?.LightsClunk(0.9f);
+            yield return new WaitForSeconds(0.9f);
+            pawn.Visual.Topple(false);
+            pawn.Toppling = false;
+            if (ended) yield break;
+            // A teammate may have freed you during the fall; only a captive goes to the hall.
+            bool admitted = pawn.Motor.Record.State == PlayerState.Captured;
+            if (admitted) backroom.Admit(pawn.Motor, seed, difficulty);
+            else { pawn.Input.Active = index == active; yield break; }
+            yield return new WaitForSeconds(0.9f);
+            if (ended) yield break;
+            ShowBanner("THE BACK HALL", "Clear 3 rooms to get back on the floor. Read the sign on each gate. The clock keeps running.", 2.6f, false);
+            yield return new WaitForSeconds(1.0f);
+            if (!ended) pawn.Input.Active = index == active;
         }
 
         private IEnumerator CaughtBeat(Pawn pawn, int index, int moves, int penalty)
@@ -392,6 +581,8 @@ namespace NightSupermarket.Game
         {
             int pts = score.Add(ScoreEvent.Admired, what);
             if (pawns[active].Motor == motor) Toast(what + "   +" + pts, 2.5f);
+            if (dare == Dare.Selfie && what.Contains("photo")) CompleteDare();
+            if (what.Contains("photo") && pawns[active].Motor == motor) photos?.Snap("A shopper's selfie with you", 0.3f);
         }
 
         private void CycleCamera()
@@ -441,6 +632,118 @@ namespace NightSupermarket.Game
             authority.Audio.Publish(AudioCue.Door);
         }
 
+        private InteractBadge badge;
+        private PhotoBooth photos;
+        private Func<PlayerMotor, bool> dressedHook;
+        private Dare dare;
+        private bool dareDone, coinTossed, ranTonight;
+        private int dareStreak;
+        private float carouselSeconds, hushUntil = -1f;
+        private Wish wish;
+        private FountainEffects fountainFx;
+
+        private void SetUpDare()
+        {
+            dare = NightDare.For(shift);
+            wish = FountainWish.For(shift);
+            dareStreak = testRun ? 0 : PlayerPrefs.GetInt("ns-dare-streak", 0);
+            EscapeInteractable.ResetLast();
+        }
+
+        /// <summary>Tonight's dare is met: points, a gem, and (on the daily shift) one more day on the streak.</summary>
+        private void CompleteDare()
+        {
+            if (dareDone) return;
+            dareDone = true;
+            int pts = score.Add(ScoreEvent.Dare, NightDare.Title(dare));
+            wardrobe.AddGem(); SaveWardrobe();
+            if (!testRun && shift == DailyShift())
+            {
+                int today = DailyShift();
+                dareStreak = NightDare.NextStreak(PlayerPrefs.GetInt("ns-dare-day", 0), PlayerPrefs.GetInt("ns-dare-streak", 0), today);
+                PlayerPrefs.SetInt("ns-dare-day", today); PlayerPrefs.SetInt("ns-dare-streak", dareStreak); PlayerPrefs.Save();
+            }
+            storeAudio?.Gem();
+            Toast("DARE DONE — " + NightDare.Title(dare) + "   +" + pts + " and a gem" + (dareStreak > 1 ? "   ·   streak " + dareStreak + " days" : ""), 5f);
+        }
+
+        /// <summary>The fountain: coins on the rim, splashing in the pool, and the effects both use.</summary>
+        private void WireFountain()
+        {
+            fountainFx = FountainEffects.Create(transform);
+            foreach (var t in GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name != "Fountain basin" || t.GetComponent<FountainCoin>() != null) continue;
+                var coin = t.gameObject.AddComponent<FountainCoin>();
+                coin.Used = () => coinTossed;
+                coin.Toss = TossCoin;
+            }
+            var pool = new GameObject("Fountain pool");
+            pool.transform.SetParent(transform, false);
+            pool.transform.position = FountainDressing.Centre + new Vector3(0f, 0.6f, 0f);
+            var box = pool.AddComponent<BoxCollider>(); box.isTrigger = true; box.size = new Vector3(FountainDressing.PoolHalf * 2f, 0.9f, FountainDressing.PoolHalf * 2f);
+            pool.layer = 2;
+            pool.AddComponent<FountainWater>().Configure(signals, at => { fountainFx.Splash(at, 14); storeAudio?.Splash(0.45f); });
+        }
+
+        private bool TossCoin(PlayerMotor motor)
+        {
+            if (coinTossed) return false;
+            coinTossed = true;
+            Vector3 from = motor.transform.position + Vector3.up * 1.4f + motor.transform.forward * 0.3f;
+            Vector3 flat = FountainDressing.Centre - motor.transform.position; flat.y = 0f;
+            Vector3 to = motor.transform.position + flat.normalized * Mathf.Min(flat.magnitude - 0.8f, 1.6f);
+            to.y = FountainDressing.WaterY;
+            fountainFx.ThrowCoin(from, to, () =>
+            {
+                storeAudio?.Splash();
+                signals.Noise.Publish(new NoiseEvent(to, FountainWish.SplashLoudness, "a coin in the fountain"));
+                string granted;
+                switch (wish)
+                {
+                    case Wish.Fortune: score.Add(ScoreEvent.Wish, "Fountain wish: fortune"); granted = "Fortune: +" + FountainWish.FortunePoints + " points"; break;
+                    case Wish.Gem: wardrobe.AddGem(); SaveWardrobe(); granted = "A gem washes up: +1 gem (Tab to spend)"; break;
+                    default: hushUntil = Time.time + FountainWish.HushSeconds; granted = "Hush: no shopper will report you for " + (int)FountainWish.HushSeconds + " s"; break;
+                }
+                Toast("Splash! The guard heard that.   Wish granted — " + granted, 5f);
+            });
+            return true;
+        }
+
+        /// <summary>What a pawn is wearing right now: borrowed clothes first, then the bought outfit.</summary>
+        private Outfit Effective(Pawn pawn) => pawn.Borrowed ?? wardrobe.Worn;
+        private void Dress(Pawn pawn) => pawn.Visual?.SetOutfit(Effective(pawn));
+
+        /// <summary>Every Clothing rack and table lends you clothes: the borrowed piece fits Clothing (and the toy store).</summary>
+        private void WireFittingRooms()
+        {
+            foreach (var t in GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name != "Clothing rack" && t.name != "Clothing table") continue;
+                if (t.GetComponent<FittingRack>() != null) continue;
+                var rack = t.gameObject.AddComponent<FittingRack>();
+                rack.Piece = t.name == "Clothing rack" ? "a jacket from the rack" : "a folded shirt";
+                rack.Wearing = m => PawnOf(m)?.Borrowed.HasValue ?? false;
+                rack.Toggle = m =>
+                {
+                    var pawn = PawnOf(m);
+                    if (pawn == null) return false;
+                    if (pawn.Borrowed.HasValue)
+                    {
+                        pawn.Borrowed = null; Dress(pawn);
+                        Toast("You put the clothes back.", 2.5f);
+                    }
+                    else
+                    {
+                        pawn.Borrowed = Outfit.BoutiqueBlack; Dress(pawn);
+                        storeAudio?.Exhale();
+                        Toast("You slipped into " + (t.name == "Clothing rack" ? "a jacket" : "a shirt") + " off the display. It hides you in Clothing and the toy store while you stand still. Caught? You lose it.", 5f);
+                    }
+                    return true;
+                };
+            }
+        }
+
         private void OnGem(Gem gem, PlayerMotor by)
         {
             gemsTonight++;
@@ -449,6 +752,7 @@ namespace NightSupermarket.Game
             SaveWardrobe();
             storeAudio?.Gem();
             int left = jobs.Gems.Count - gemsTonight;
+            if (left == 0 && dare == Dare.AllGems) CompleteDare();
             Toast("Gem " + gemsTonight + " of " + jobs.Gems.Count + "   +" + pts + "   ·   " + wardrobe.Tokens + (wardrobe.Tokens == 1 ? " gem" : " gems") + " to spend on outfits (Tab)"
                 + (left > 0 ? "" : "   ·   all found tonight"), 4.5f);
         }
@@ -477,7 +781,7 @@ namespace NightSupermarket.Game
                 else if (wardrobe.TryBuy(menuOutfit)) Toast("Bought and wearing " + Wardrobe.Name(menuOutfit) + " — " + Wardrobe.Describe(menuOutfit), 3.5f);
                 else Toast(Wardrobe.Name(menuOutfit) + " costs " + Wardrobe.Cost(menuOutfit) + " gems; you have " + wardrobe.Tokens + ". Gems glint after lights out.", 3.5f);
                 SaveWardrobe();
-                foreach (var pawn in pawns) pawn.Visual?.SetOutfit(wardrobe.Worn);
+                foreach (var pawn in pawns) Dress(pawn);
             }
         }
 
@@ -500,9 +804,8 @@ namespace NightSupermarket.Game
         {
             if (jobs == null || jobs.Shutter == null || jobs.Shutter.Down) return;
             jobs.Shutter.Drop();
-            if (jobs.FireExit != null) escapeGuide = jobs.FireExit;
             if (loud && storeAudio != null) storeAudio.ShutterDown();
-            if (loud) Toast("The front shutter is down. The FIRE EXIT is upstairs — take the escalator by Clothing.", 6f);
+            if (loud) Toast("The supermarket shutter is down. Inside? The FIRE EXIT is upstairs. In the mall? The front doors are still open.", 6f);
         }
 
         private static string PhaseName(NightPhase phase) => phase switch
@@ -546,11 +849,18 @@ namespace NightSupermarket.Game
                 var before = pawn.Detection == null ? DetectionState.Green : pawn.Detection.Detection.State;
                 int suspicion = pawn.Detection == null ? 0 : pawn.Detection.Detection.Suspicion.Value;
                 pawn.Motor.Simulate(command, delta);
+                if (pawn.Motor.Record.State == PlayerState.Running) ranTonight = true;
+                if (pawn.Motor.Surface is CarouselRide turning && turning.Speed > 1f && pawn.Motor.Record.Free)
+                {
+                    carouselSeconds += delta;
+                    if (dare == Dare.CarouselRide && carouselSeconds >= NightDare.CarouselSeconds) CompleteDare();
+                }
                 if (pawn.Motor.ActualSpeed > rules.movementThreshold && pawn.Motor.Record.Free) pawn.LastMoved = Time.time;
                 if (pawn.Detection != null)
                 {
                     var detection = pawn.Detection.Detection;
-                    pawn.Detection.PoseCamouflage = pawn.Mannequin.Matches || Wardrobe.Fits(wardrobe.Worn, pawn.Mannequin.Zone);
+                    pawn.Detection.PoseCamouflage = pawn.Mannequin.Matches || Wardrobe.Fits(Effective(pawn), pawn.Mannequin.Zone);
+                    pawn.Detection.CrowdCover = pawn.Cover != null && pawn.Cover.Strength >= CoverRules.GuardDoubtFrom;
                     if (pawn.Mannequin.TwitchedThisTick) { pawn.Detection.Twitch = true; if (i == active) Toast("Your arm twitched — held the pose too long", 2.5f); }
                     if (Covered(pawn.Motor)) { detection.Reset(); pawn.Detection.Twitch = false; }
                     else pawn.Detection.Tick(delta);
@@ -639,13 +949,28 @@ namespace NightSupermarket.Game
         {
             if (next != MatchPhase.Victory && next != MatchPhase.Defeat) return;
             if (next == MatchPhase.Victory) score.AddEscapeTime(authority.Clock.Remaining);
+            if (next == MatchPhase.Victory && !dareDone)
+            {
+                bool viaFire = jobs != null && jobs.FireExit != null && EscapeInteractable.Last != null && EscapeInteractable.Last.transform == jobs.FireExit;
+                bool met = dare switch
+                {
+                    Dare.Wish => coinTossed,
+                    Dare.Unreported => authority.Stats.Reports == 0,
+                    Dare.NeverRun => !ranTonight,
+                    Dare.FireExit => viaFire,
+                    _ => false
+                };
+                if (met) CompleteDare();
+            }
             ended = true;
             newBest = score.Total > bestBefore;
             if (newBest) PlayerPrefs.SetInt("ns-best-" + shift, score.Total);
             if (next == MatchPhase.Victory) PlayerPrefs.SetInt("ns-career", Career.Add(careerBefore, score.Total));
             PlayerPrefs.SetInt("ns-nights", PlayerPrefs.GetInt("ns-nights", 0) + 1);
             PlayerPrefs.Save();
+            WriteCrowdMetrics(next == MatchPhase.Victory);
             if (board != null && !testRun) board.Record(shift, score.Total, score.Grade(next == MatchPhase.Victory));
+            if (next == MatchPhase.Victory) photos?.Snap("Escaped! Shift #" + shift + " · " + score.Total.ToString("N0") + " pts", 0.05f);
             Cursor.lockState = CursorLockMode.None;
             Time.timeScale = 1f;
             help = false;
@@ -722,6 +1047,17 @@ namespace NightSupermarket.Game
         {
             var keyboard = Keyboard.current;
             if (keyboard == null || authority == null) return;
+            if (choosingShift)
+            {
+                if (keyboard.digit1Key.wasPressedThisFrame || keyboard.numpad1Key.wasPressedThisFrame) shiftCard.Pick(0);
+                if (keyboard.digit2Key.wasPressedThisFrame || keyboard.numpad2Key.wasPressedThisFrame) shiftCard.Pick(1);
+                if (keyboard.digit3Key.wasPressedThisFrame || keyboard.numpad3Key.wasPressedThisFrame) shiftCard.Pick(2);
+                if (keyboard.leftArrowKey.wasPressedThisFrame || keyboard.aKey.wasPressedThisFrame) shiftCard.Pick(Mathf.Max(0, shiftCard.Selected - 1));
+                if (keyboard.rightArrowKey.wasPressedThisFrame || keyboard.dKey.wasPressedThisFrame) shiftCard.Pick(Mathf.Min(2, shiftCard.Selected + 1));
+                if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame) ClockIn();
+                return;
+            }
+            TrackCrowdMetrics();
             if (authority.Flow.Ended)
             {
                 if (editingName)
@@ -782,7 +1118,8 @@ namespace NightSupermarket.Game
             if (active < pawns.Count)
             {
                 var pawn = pawns[active];
-                pawn.View.ShowPose = autoPoseCam && pawn.Mannequin.Holding && !pawn.Motor.Record.InBackroom;
+                pawn.View.ShowPose = pawn.Toppling || autoPoseCam && pawn.Mannequin.Holding && !pawn.Motor.Record.InBackroom;
+                if (badge != null) badge.Show(help || ended || Cursor.lockState != CursorLockMode.Locked ? null : pawn.Probe.Target, pawn.View.View);
                 bool firstPerson = pawn.View.Effective == ViewMode.FirstPerson;
                 if (pawn.Visual != null && pawn.FirstPersonShown != firstPerson) { pawn.Visual.SetFirstPerson(firstPerson); pawn.FirstPersonShown = firstPerson; }
             }
@@ -803,7 +1140,7 @@ namespace NightSupermarket.Game
 
         private void OnApplicationFocus(bool focused)
         {
-            if (PauseOnFocusLoss && !focused && !help && authority != null && authority.Flow.Phase == MatchPhase.Night && !ended)
+            if (PauseOnFocusLoss && !focused && !help && !choosingShift && authority != null && authority.Flow.Phase == MatchPhase.Night && !ended)
                 ToggleMenu(MenuPage.Night);
         }
 
@@ -949,7 +1286,7 @@ namespace NightSupermarket.Game
                 string look = pawns[active].Probe.Prompt;
                 return backroom.NoteShowing(pawns[active].Motor) || string.IsNullOrEmpty(look) ? backroom.PromptFor(pawns[active].Motor) : look;
             }
-            if (Cursor.lockState != CursorLockMode.Locked && authority.Flow.Phase == MatchPhase.Night) return "Click to play";
+            if (Cursor.lockState != CursorLockMode.Locked && authority.Flow.Phase == MatchPhase.Night && !choosingShift) return "Click to play";
             if (active == pawns.Count) return "";
             var pawn = pawns[active];
             if (pawn.Motor.Record.State == PlayerState.Captured) return "Captured. V opens the cameras. A teammate can free you at the warehouse panel.";
@@ -962,10 +1299,21 @@ namespace NightSupermarket.Game
                 return jobs.CarryPrompt(carried.Held, missions.Missions);
             if (!string.IsNullOrEmpty(pawn.Probe.Prompt)) return pawn.Probe.Prompt;
             if (jobs.Window != null && !jobs.Window.Complete && jobs.Window.Worker == pawn.Motor) return jobs.Window.PromptFor(pawn.Motor);
+            if (jobs.RideSpot != null && !jobs.RideSpot.Complete && (jobs.RideSpot.Worker == pawn.Motor || pawn.Motor.Surface == jobs.Carousel)) return jobs.RideSpot.PromptFor(pawn.Motor);
+            if (pawn.Motor.Surface is EscalatorBelt) return "The escalator carries you — and a mannequin riding up is a mannequin that moves. The stairs let you stop.";
+            if (pawn.Motor.Surface is CarouselRide spinning) return spinning.Speed > 0.5f ? "The carousel turns: riders are not moving. Hold a pose and enjoy the view." : "The carousel has stopped. You are a mannequin standing on a ride — hold still.";
             var at = pawn.Motor.transform.position;
-            if (at.x > -8 && at.x < 0 && at.z > 5 && at.z < 15)
-                return pawn.Inventory.Items.Count("shirt") == 0 ? "Clothing — E on a blue shirt on either table" :
-                    "Clothing — blue model stand by the mannequins: empty hands, stand still, E to pose";
+            if (at.y < 2.5f && at.x > -8 && at.x < 0 && at.z > 5 && at.z < 15)
+            {
+                // Only mention the blue shirt on nights that have the shirt job; otherwise point at the racks.
+                var shirtJob = MissionBy("steal-shirt");
+                if (shirtJob != null && !shirtJob.Complete && pawn.Inventory.Items.Count("shirt") == 0)
+                    return "Clothing — the BLUE shirt with the SHIRT · E sign is your job. Any rack or table: E to try clothes on.";
+                if (pawn.Inventory.Items.Count("shirt") > 0)
+                    return "Clothing — blue model stand by the mannequins: empty hands, stand still, E to pose";
+                return pawn.Borrowed.HasValue ? "Clothing — you are wearing borrowed clothes: they hide you here while you stand still."
+                    : "Clothing — walk up to a rack or a table and press E to try something on. It disguises you here.";
+            }
             return "";
         }
 
@@ -985,7 +1333,11 @@ namespace NightSupermarket.Game
             if (motor == null || !motor.Record.Free || help) return;
             if (missions != null && missions.Complete)
             {
-                if (escapeGuide != null) PointGuide(escapeGuide.position, "ESCAPE");
+                // After lockdown the supermarket is shuttered: inside, the fire exit upstairs; out in the mall, the front door.
+                bool shuttered = jobs != null && jobs.Shutter != null && jobs.Shutter.Down;
+                bool inside = motor.transform.position.z > -14.5f;
+                var target = shuttered && inside && jobs.FireExit != null ? jobs.FireExit : escapeGuide;
+                if (target != null) PointGuide(target.position, target == jobs.FireExit ? "FIRE EXIT" : "ESCAPE");
                 return;
             }
             if (missions == null || jobs == null) return;
@@ -1005,6 +1357,22 @@ namespace NightSupermarket.Game
             hudModel.GuideX = world.x;
             hudModel.GuideY = world.y;
             hudModel.GuideZ = world.z;
+        }
+
+        private bool CameraReport(PlayerMotor body)
+        {
+            var at = body.transform.position;
+            var zone = directory != null ? directory.ZoneAt(at) : null;
+            var report = new SuspiciousActivityEvent("Camera", body.Record.Id, new MapPoint(at.x, at.y, at.z), Time.timeAsDouble, 0.9, ReportKind.MovingMannequin, zone);
+            bool accepted = authority.TryReport(report);
+            if (accepted) Toast("The camera caught you moving in its light. The guard has been told.", 4f);
+            return accepted;
+        }
+
+        private void CameraFirstSeen(PlayerMotor body)
+        {
+            if (PawnOf(body) == null || PawnOf(body) != pawns[Mathf.Min(active, pawns.Count - 1)]) return;
+            Toast("Security camera: you are in its red light. Don't move while it is on you; wait for it to sweep past.", 5f);
         }
 
         private void OnReport(SuspiciousActivityEvent report)
@@ -1077,6 +1445,30 @@ namespace NightSupermarket.Game
             hudModel.GuardName = guardProfile != null ? guardProfile.Name.ToUpperInvariant() : "GUARD";
             hudModel.GuardTell = guardProfile != null ? guardProfile.Name + " — " + guardProfile.Trait + ". " + guardProfile.Tell : "";
             hudModel.WardrobeText = WardrobeCopy();
+            hudModel.DareText = "Tonight's dare — " + NightDare.Title(dare) + ": " + NightDare.Describe(dare) + (dareDone ? "   DONE +" + NightDare.Points + " and a gem" : "   (+" + NightDare.Points + " and a gem)")
+                + (dareStreak > 1 ? "   ·   dare streak " + dareStreak + " days" : "");
+            if (crowd != null)
+            {
+                hudModel.CrowdText = crowd.NightLine;
+                hudModel.EventText = crowd.EventLine;
+                hudModel.EventHot = crowd.Stage == SaleStage.Open;
+                if (crowd.TryMark(out var saleAt, out var saleLabel)) hudModel.Marks.Add(new MapMark(saleAt, "#FF8A3D", saleLabel));
+                int next = -1;
+                if (missions != null) for (int i = 0; i < missions.Missions.Count && next < 0; i++) if (!missions.Missions[i].Complete && !missions.Missions[i].Failed) next = i;
+                string crowdTint = "#9FB3C8";
+                hudModel.JobCrowdText = next >= 0 ? crowd.JobLine(next, out crowdTint) : "";
+                hudModel.JobCrowdTint = crowdTint;
+                if (missions != null)
+                    for (int i = 0; i < missions.Missions.Count; i++)
+                        if (crowd.TryQuietMark(i, out var quietAt)) hudModel.Marks.Add(new MapMark(quietAt, "#40DF80", "quiet"));
+                var filming = crowd.InfluencerOnFloor;
+                if (filming != null) hudModel.Marks.Add(new MapMark(filming.transform.position, "#FF3B30", "REC"));
+                foreach (var h in crowd.Heat)
+                    hudModel.Heat.Add((HudText.MapZone(h.Zone), h.Level, h.Trend, h.People));
+                var cover = active < pawns.Count ? pawns[active].Cover : null;
+                hudModel.CoverOn = cover != null && cover.Covered;
+                hudModel.CoverText = cover == null ? "" : cover.Covered ? "IN THE CROWD · " + cover.Companions + " shoppers hide you" : cover.Hint;
+            }
             hudModel.GemText = jobs == null || jobs.Gems.Count == 0 ? "" : "Hidden gems tonight: " + jobs.Gems.Count + " · found " + gemsTonight
                 + (phase == NightPhase.Dark || phase == NightPhase.Lockdown ? " · they glint now (cyan on the map)" : " · they only glint after lights out");
             if (jobs != null)
@@ -1085,8 +1477,9 @@ namespace NightSupermarket.Game
             if (active < pawns.Count && !help)
             {
                 var zone = pawns[active].Mannequin.Zone;
-                if (zone.HasValue && Wardrobe.Fits(wardrobe.Worn, zone) && outfitNoted.Add(zone.Value))
-                    Toast("Your " + Wardrobe.Name(wardrobe.Worn).ToLowerInvariant() + " fits " + HudText.ZoneLabel(zone) + ": stand still and the guard doubts what he saw.", 4f);
+                var wearing = Effective(pawns[active]);
+                if (zone.HasValue && Wardrobe.Fits(wearing, zone) && outfitNoted.Add(zone.Value))
+                    Toast("Your " + (pawns[active].Borrowed.HasValue ? "borrowed clothes fit" : Wardrobe.Name(wearing).ToLowerInvariant() + " fits") + " " + HudText.ZoneLabel(zone) + ": stand still and the guard doubts what he saw.", 4f);
             }
             hudModel.Prompt = BuildPrompt();
             hudModel.Toast = Time.unscaledTime < reportToastUntil ? reportToast : Time.unscaledTime < toastUntil ? toastText : "";
@@ -1219,7 +1612,10 @@ namespace NightSupermarket.Game
             string best = newBest ? "NEW BEST for shift #" + shift : bestBefore > 0 ? "Best for shift #" + shift + ": " + bestBefore.ToString("N0") : "First attempt at shift #" + shift;
             hudModel.EndDetail = (victory ? "Out before dawn. " : "Time ran out before the escape. ") + best + "\n"
                 + score.CloseCalls + (score.CloseCalls == 1 ? " close call" : " close calls") + " · best unseen streak " + HudText.Clock(score.BestStreakSeconds)
-                + " · " + authority.Stats.Reports + (authority.Stats.Reports == 1 ? " report" : " reports") + " · " + authority.Stats.Captures + (authority.Stats.Captures == 1 ? " capture" : " captures");
+                + " · " + authority.Stats.Reports + (authority.Stats.Reports == 1 ? " report" : " reports") + " · " + authority.Stats.Captures + (authority.Stats.Captures == 1 ? " capture" : " captures")
+                + "\n" + DifficultyRules.Name(difficulty) + " shift (score ×" + DifficultyRules.ScoreFactor(difficulty).ToString("0.0#") + ") · crowd " + CrowdPlan.LevelName(crowd != null ? crowd.Level : 0)
+                + (pawns.Count > 0 && pawns[0].Cover != null && pawns[0].Cover.CoveredSeconds >= 1 ? " · hid in the crowd for " + HudText.Clock(pawns[0].Cover.CoveredSeconds) : "")
+                + (crowd != null && crowd.InfluencerClips > 0 ? " · went viral " + crowd.InfluencerClips + "×" : "");
             // Collapse repeated events into one line each so the card stays short.
             var totals = new Dictionary<ScoreEvent, (int count, int points)>();
             foreach (var line in score.Lines)
@@ -1237,6 +1633,8 @@ namespace NightSupermarket.Game
             var nextUnlock = Career.Next(careerAfter);
             string unlocked = victory && Career.Next(careerBefore).HasValue && (!nextUnlock.HasValue || nextUnlock.Value.gadget != Career.Next(careerBefore).Value.gadget)
                 ? "   UNLOCKED: " + Career.Name(Career.Next(careerBefore).Value.gadget) + " — " + Career.Describe(Career.Next(careerBefore).Value.gadget) : "";
+            hudModel.EndDetail += "\nDare " + (dareDone ? "done: " : "missed: ") + NightDare.Title(dare) + (dareStreak > 1 ? " · streak " + dareStreak + " days" : "")
+                + (photos != null && photos.Taken > 0 ? "   ·   " + photos.Taken + (photos.Taken == 1 ? " photo" : " photos") + " saved to Pictures/Night Mall" : "");
             hudModel.EndDetail += "\nCareer " + careerAfter.ToString("N0") + (nextUnlock.HasValue ? " · " + nextUnlock.Value.pointsAway.ToString("N0") + " to " + Career.Name(nextUnlock.Value.gadget) : " · everything unlocked") + unlocked;
             FillBoard();
         }
@@ -1322,6 +1720,7 @@ namespace NightSupermarket.Game
             reportSubscription?.Dispose();
             if (authority != null) authority.Flow.Changed -= OnPhaseChanged;
             if (editingName && Keyboard.current != null) Keyboard.current.onTextInput -= OnNameChar;
+            if (DisplayCamouflage.Dressed == dressedHook) DisplayCamouflage.Dressed = null;
             Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.None;
         }
@@ -1338,7 +1737,13 @@ namespace NightSupermarket.Game
             public DetectionCoordinator Detection;
             public CharacterVisual Visual;
             public float LastMoved = -10f;
+            /// <summary>Clothes taken off a Clothing rack tonight; they override the worn outfit until caught or put back.</summary>
+            public Outfit? Borrowed;
+            /// <summary>True for the second it takes to fall over after a capture; the camera shows it.</summary>
+            public bool Toppling;
             public bool CloseCallPending, SightingSlipped, FirstPersonShown = true;
+            /// <summary>Walking with the crowd (see <see cref="CrowdCover"/>).</summary>
+            public CrowdCover Cover;
         }
     }
 

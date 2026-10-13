@@ -64,8 +64,11 @@ namespace NightSupermarket.Core
             settings.Validate();
         }
 
-        /// <summary>Advances the reading. Returns true exactly once, when a report should be sent.</summary>
-        public bool Tick(bool visible, double targetSpeed, MapPoint targetPosition, double delta)
+        /// <summary>
+        /// Advances the reading. Returns true exactly once, when a report should be sent. <paramref name="concealment"/>
+        /// is the crowd's share of the movement (see <see cref="CoverRules"/>): a mannequin walking with shoppers is half-noticed.
+        /// </summary>
+        public bool Tick(bool visible, double targetSpeed, MapPoint targetPosition, double delta, double concealment = 0)
         {
             GameRules.RequireDelta(delta);
             if (delta == 0) return false;
@@ -75,7 +78,7 @@ namespace NightSupermarket.Core
                 LastKnown = targetPosition; HasLastKnown = true;
                 watched += delta; unseen = 0;
                 bool moving = targetSpeed > settings.MovementThreshold && watched >= settings.NoticeTime;
-                if (moving) Suspicion += settings.SuspicionGain * settings.Sensitivity * delta;
+                if (moving) Suspicion += CoverRules.Gain(settings.SuspicionGain * settings.Sensitivity, concealment) * delta;
                 else Suspicion -= settings.StillDecay * delta;
             }
             else

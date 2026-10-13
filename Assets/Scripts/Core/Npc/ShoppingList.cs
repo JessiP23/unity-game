@@ -49,6 +49,15 @@ namespace NightSupermarket.Core
             .Add(ZoneType.Clothing, "Shirt", "Jacket", "Shoes", "Jeans", "Hat")
             .Add(ZoneType.Electronics, "TV", "Phone charger", "Headphones", "Game console", "Radio")
             .Add(ZoneType.Home, "Lamp", "Cushion", "Vase", "Armchair", "Picture frame");
+
+        /// <summary>The supermarket's four departments plus the mall's: the gallery upstairs and the toy store.</summary>
+        public static ShoppingCatalog Mall { get; } = new ShoppingCatalog()
+            .Add(ZoneType.Supermarket, "Milk", "Bread", "Canned beans", "Apples", "Bananas", "Detergent", "Wine", "Croissants", "Onions")
+            .Add(ZoneType.Clothing, "Shirt", "Jacket", "Shoes", "Jeans", "Hat")
+            .Add(ZoneType.Electronics, "TV", "Phone charger", "Headphones", "Game console", "Radio")
+            .Add(ZoneType.Home, "Lamp", "Cushion", "Vase", "Armchair", "Picture frame")
+            .Add(ZoneType.Mezzanine, "Sofa cushion", "Smart speaker", "Reading lamp", "Tablet")
+            .Add(ZoneType.ToyStore, "Teddy bear", "Puzzle", "Toy car", "Board game", "Building blocks");
     }
 
     /// <summary>

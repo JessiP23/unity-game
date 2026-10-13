@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace NightSupermarket.Core
 {
     /// <summary>Semantic store areas. Rules ask "is this zone allowed", never "is this the warehouse".</summary>
-    public enum ZoneType { EntranceExit, Checkout, Supermarket, Clothing, Home, Electronics, CustomerService, Warehouse, Employee, Security, Mezzanine }
+    public enum ZoneType { EntranceExit, Checkout, Supermarket, Clothing, Home, Electronics, CustomerService, Warehouse, Employee, Security, Mezzanine, Atrium, ToyStore }
 
     /// <summary>Which zones an NPC role may walk into.</summary>
     public sealed class ZoneAccess
@@ -23,7 +23,7 @@ namespace NightSupermarket.Core
         public static ZoneAccess Customer { get; } = new ZoneAccess(new[]
         {
             ZoneType.EntranceExit, ZoneType.Checkout, ZoneType.Supermarket, ZoneType.Clothing,
-            ZoneType.Home, ZoneType.Electronics, ZoneType.CustomerService, ZoneType.Mezzanine
+            ZoneType.Home, ZoneType.Electronics, ZoneType.CustomerService, ZoneType.Mezzanine, ZoneType.Atrium, ZoneType.ToyStore
         });
         public static ZoneAccess Employee { get; } = new ZoneAccess((ZoneType[])Enum.GetValues(typeof(ZoneType)));
     }

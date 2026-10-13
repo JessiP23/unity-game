@@ -25,7 +25,7 @@ namespace NightSupermarket.Game
         };
         private static readonly string[] AisleNames = { "1  CANNED & DRY FOOD", "2  CLEANING & HOUSEHOLD", "3  WINE & BAKERY" };
 
-        public static void Apply(Transform root, LightingMode mode)
+        public static void Apply(Transform root, LightingMode mode, WorldSignals signals = null)
         {
             var lighting = StoreLighting.Create(root);
             var fixed_ = new GameObject("Dressing").transform; fixed_.SetParent(root, false);
@@ -42,8 +42,23 @@ namespace NightSupermarket.Game
                 switch (name)
                 {
                     case "Floor": Skin(renderer, "tiled_floor_001", 2.2f, new Color(0.98f, 0.97f, 0.94f), 0.55f, true); break;
-                    case "North wall": case "South wall": case "West wall": case "East wall":
+                    case "North wall": case "South wall": case "West wall": case "East wall": case "Atrium wall": case "Mall front": case "Toy wall":
                         Skin(renderer, "white_plaster_02", 3f, new Color(0.9f, 0.9f, 0.88f), 0.15f, false); break;
+                    case "Atrium floor": Skin(renderer, "tiled_floor_001", 2.2f, new Color(0.92f, 0.92f, 0.9f), 0.55f, true); break;
+                    case "Toy floor": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.5f, 0.28f, 0.32f), 0.05f); break;
+                    case "Atrium roof": renderer.sharedMaterial = ArtLibrary.Glass(new Color(0.5f, 0.6f, 0.8f, 0.35f)); break;
+                    case "Roof beam": case "Stair rail": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.2f, 0.21f, 0.24f), 0.7f, 0.85f); break;
+                    case "Fountain basin":
+                        renderer.sharedMaterial = ArtLibrary.Surface("marble_01", new Vector2(2f, 0.4f), new Color(0.93f, 0.92f, 0.9f), 0.7f)
+                            ?? ArtLibrary.Surface("smooth_concrete_floor", new Vector2(2f, 0.4f), new Color(0.88f, 0.87f, 0.84f), 0.5f) ?? renderer.sharedMaterial;
+                        break;
+                    case "Fountain column": case "Fountain bed": renderer.enabled = false; break;
+                    case "Planter":
+                        Skin(renderer, "smooth_concrete_floor", 1.5f, new Color(0.78f, 0.76f, 0.72f), 0.3f, false); break;
+                    case "Bench": case "Step stool": Skin(renderer, "wood_table_001", 1.2f, new Color(0.8f, 0.68f, 0.5f), 0.4f, false); break;
+                    case "Stair": Skin(renderer, "smooth_concrete_floor", 2.5f, new Color(0.8f, 0.79f, 0.76f), 0.3f, false); break;
+                    case "Toy ceiling": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.93f, 0.9f, 0.72f), 0.05f); break;
+                    case "Toy shelf": case "Robot shelf": renderer.sharedMaterial = ArtLibrary.Lit(new Color(0.95f, 0.95f, 0.93f), 0.4f); break;
                     case "Warehouse wall": case "Warehouse south wall left": case "Warehouse south wall right": case "Security partition":
                     case "Staff wall left": case "Staff wall right": case "Staff wall west": case "Staff wall lintel":
                         Skin(renderer, "concrete_block_wall_02", 2.5f, new Color(0.78f, 0.78f, 0.76f), 0.1f, false); break;
@@ -102,7 +117,10 @@ namespace NightSupermarket.Game
                 }
             }
             Shell(fixed_, lighting, art);
-            if (art) { Front(fixed_, lighting); Warehouse(fixed_); StaffRoom(fixed_); StoreFloor(fixed_, rng); DepartmentDressing.Floors(fixed_); DepartmentDressing.LivingRoom(fixed_); }
+            MallDressing.Escalator(fixed_, lighting);
+            MallDressing.Atrium(fixed_, lighting, rng);
+            MallDressing.ToyStore(fixed_, lighting, signals, rng);
+            if (art) { Warehouse(fixed_); StaffRoom(fixed_); StoreFloor(fixed_, rng); DepartmentDressing.Floors(fixed_); DepartmentDressing.LivingRoom(fixed_); }
             DepartmentDressing.Entrance(fixed_, lighting);
             Signs(fixed_, lighting);
             DepartmentDressing.Signs(fixed_, placementZone);
@@ -137,7 +155,7 @@ namespace NightSupermarket.Game
             {
                 new Vector3(-2, 2.85f, -14.7f), new Vector3(-14.7f, 2.85f, -4), new Vector3(14.7f, 2.85f, -4),
                 new Vector3(0, 2.85f, 14.7f), new Vector3(-12.5f, 2.85f, 8.25f), new Vector3(11.5f, 2.85f, 5.2f),
-                new Vector3(12.5f, PrimitiveWorld.UpstairsY + 2.85f, 14.7f)
+                new Vector3(14.2f, PrimitiveWorld.UpstairsY + 2.85f, 14.7f)
             };
             // Fire exit upstairs: a green sign that never goes out, so lockdown still shows the way.
             Panel(parent, "Fire exit sign", PrimitiveWorld.FireExit + new Vector3(0, 1.5f, -0.25f), new Vector3(0.9f, 0.3f, 0.05f)).sharedMaterial = ArtLibrary.Emissive(new Color(0.2f, 1f, 0.45f), 1.6f);
@@ -280,12 +298,6 @@ namespace NightSupermarket.Game
             }
         }
 
-        private static void Front(Transform parent, StoreLighting lighting)
-        {
-            Panel(parent, "Push bar", new Vector3(5, 1.0f, -14.42f), new Vector3(1.1f, 0.06f, 0.06f)).sharedMaterial = ArtLibrary.Lit(new Color(0.75f, 0.75f, 0.78f), 0.7f, 0.9f);
-            lighting.AddGlow(new Vector3(5, 2.55f, -14.3f), new Color(0.25f, 0.95f, 0.4f), 2.8f, 0.55f);
-        }
-
         // ---- Back of house ----------------------------------------------------------------------
 
         private static void Racks(Transform parent, Vector3 center, Random rng)
@@ -330,11 +342,16 @@ namespace NightSupermarket.Game
             ArtLibrary.Spawn("metal_office_desk", parent, floor, 180);
             Solid(ArtLibrary.Spawn("metal_stool_03", parent, floor + new Vector3(0.2f, 0, -0.95f), 20));
             ArtLibrary.Spawn("clipboard", parent, floor + new Vector3(0.65f, 0.78f, -0.15f), 15);
-            var screen = ArtLibrary.Emissive(new Color(0.35f, 0.95f, 0.65f), 1.6f);
+            int feed = 0;
             foreach (float x in new[] { -0.45f, 0.35f })
             {
-                ArtLibrary.Spawn("television_02", parent, floor + new Vector3(x, 0.78f, 0.12f), 180);
-                Panel(parent, "Monitor screen", floor + new Vector3(x, 0.78f + 0.22f, -0.075f), new Vector3(0.26f, 0.2f, 0.005f)).sharedMaterial = screen;
+                var screen = ArtLibrary.Screen(new Color(0.35f, 0.95f, 0.65f), ArtLibrary.ScreenShow.Cctv, feed++);
+                var monitor = ArtLibrary.Spawn("television_02", parent, floor + new Vector3(x, 0.78f, 0.12f), 180);
+                if (FitScreen(parent, monitor, Vector3.back, 0.56f, screen, "Monitor screen") == null && monitor != null)
+                {
+                    var bounds = ArtLibrary.BoundsOf(monitor);
+                    Panel(parent, "Monitor screen", new Vector3(bounds.center.x, bounds.center.y + 0.02f, bounds.min.z - 0.003f), new Vector3(bounds.size.x * 0.62f, bounds.size.y * 0.5f, 0.005f)).sharedMaterial = screen;
+                }
             }
             lighting.AddGlow(floor + new Vector3(0, 1.1f, -0.5f), new Color(0.35f, 0.95f, 0.65f), 2.2f, 0.45f);
         }

@@ -46,6 +46,11 @@ namespace NightSupermarket.Tests
             Assert.That(ZoneAccess.Customer.Allows(ZoneType.Mezzanine), Is.True);
             Assert.That(ZoneAccess.IsRestricted(ZoneType.Mezzanine), Is.False);
             Assert.That(PoseLibrary.ExpectedIn(ZoneType.Mezzanine), Is.EqualTo(Stance.Lounging));
+            Assert.That(ZoneAccess.Customer.Allows(ZoneType.Atrium) && ZoneAccess.Customer.Allows(ZoneType.ToyStore), Is.True);
+            Assert.That(PoseLibrary.ExpectedIn(ZoneType.ToyStore), Is.EqualTo(Stance.Display));
+            Assert.That(PoseLibrary.ExpectedIn(ZoneType.Atrium), Is.EqualTo(Stance.Lounging));
+            Assert.That(JobCatalog.Find("carousel-ride"), Is.Not.Null);
+            Assert.That(JobCatalog.Find("top-shelf-robot").Family, Is.EqualTo("grab"));
         }
         [Test] public void GemPicksAreSeededDistinctAndIncludeAGatedSpot()
         {

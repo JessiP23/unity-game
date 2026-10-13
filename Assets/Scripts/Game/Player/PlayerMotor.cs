@@ -20,7 +20,16 @@ namespace NightSupermarket.Game
         public Vector3 PlanarVelocity => planar;
         public bool Grounded => controller != null && controller.isGrounded;
         public GameRulesAsset Rules { get; private set; }
+        /// <summary>Walking with a group, you fall into step: walking speed is held to theirs (sprinting ignores it).</summary>
+        public float PaceCap { get; set; } = float.PositiveInfinity;
+        /// <summary>The moving floor under the feet this step, if any.</summary>
+        public MovingSurface Surface { get; private set; }
         private CharacterController controller;
+        private MovingSurface SurfaceUnder()
+        {
+            return Physics.Raycast(transform.position + Vector3.up * 0.3f, Vector3.down, out var hit, 0.6f, ~(1 << 2), QueryTriggerInteraction.Ignore)
+                ? hit.collider.GetComponentInParent<MovingSurface>() : null;
+        }
         private Vector3 planar;
         private float vertical;
         public void Configure(GameRulesAsset rules, PlayerRecord record)
@@ -42,12 +51,26 @@ namespace NightSupermarket.Game
             if (input.Jump && grounded) vertical = Mathf.Sqrt(2 * Rules.gravity * Rules.jumpHeight);
             vertical -= Rules.gravity * delta;
             Vector3 target = transform.TransformDirection(new Vector3(move.x, 0, move.y)) * (input.Sprint ? Rules.sprintSpeed : Rules.walkSpeed);
+            if (!input.Sprint && target.magnitude > PaceCap) target = target.normalized * PaceCap;
             float rate = target.sqrMagnitude > planar.sqrMagnitude ? Rules.acceleration : Rules.deceleration;
             if (!grounded) rate *= Rules.airControl;
             planar = Vector3.MoveTowards(planar, target, rate * delta);
+            // A moving floor (escalator, carousel) carries the body first; then the body's own move. Each part is
+            // measured as what actually happened, and the carry only counts as movement if the floor says so.
             Vector3 before = transform.position;
+            Surface = grounded ? SurfaceUnder() : null;
+            Vector3 carriedActual = Vector3.zero;
+            if (Surface != null)
+            {
+                Vector3 carry = Surface.Displacement(transform.position, delta);
+                float yaw = Surface.YawDelta(delta);
+                if (Mathf.Abs(yaw) > 0.0001f) transform.Rotate(0f, yaw, 0f, Space.World);
+                if (carry.sqrMagnitude > 0f) { controller.Move(carry); carriedActual = transform.position - before; }
+            }
+            Vector3 mid = transform.position;
             controller.Move(new Vector3(planar.x, vertical, planar.z) * delta);
-            Vector3 moved = (transform.position - before) / delta;
+            Vector3 own = transform.position - mid;
+            Vector3 moved = (own + (Surface != null && Surface.CountsAsMovement ? carriedActual : Vector3.zero)) / delta;
             ActualSpeed = moved.magnitude;
             var actualPlanar = new Vector3(moved.x, 0, moved.z);
             if (actualPlanar.sqrMagnitude < planar.sqrMagnitude) planar = actualPlanar;
