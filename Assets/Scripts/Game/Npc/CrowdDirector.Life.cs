@@ -62,6 +62,8 @@ namespace NightSupermarket.Game
         public IReadOnlyList<ZoneHeat> Heat => heat;
         /// <summary>The influencer, if still on the floor (a pooled body reused for someone else no longer counts).</summary>
         public NpcController InfluencerOnFloor => influencer != null && influencer.isActiveAndEnabled && influencer.Id == influencerId ? influencer : null;
+        /// <summary>The influencer's live stream (tag, likes, the shot on the floor), while they are here.</summary>
+        public LiveStream Stream { get { var who = InfluencerOnFloor; return who != null ? who.GetComponent<LiveStream>() : null; } }
         public int Crew => crew.Count;
         /// <summary>Seconds the player has spent near each unfinished job (night metrics: how long the crowd made them wait).</summary>
         public readonly Dictionary<int, double> WaitSeconds = new Dictionary<int, double>();
@@ -74,8 +76,15 @@ namespace NightSupermarket.Game
             Difficulty = difficulty;
             if (population == null) return;
             population.DifficultyFactor = (float)DifficultyRules.CrowdFactor(difficulty);
-            sales = CrowdPlan.SalesFor(shift, DifficultyRules.Sales(difficulty));
+            SetSalesCount(DifficultyRules.Sales(difficulty));
             if (KindsEnabled) ApplyKindChances();
+        }
+
+        /// <summary>How many flash sales tonight (special nights change it: Black Friday's four doorbusters).</summary>
+        public void SetSalesCount(int count)
+        {
+            sales = CrowdPlan.SalesFor(shift, count);
+            announced = opened = closed = -1;
         }
 
         private void ApplyKindChances()
@@ -98,6 +107,7 @@ namespace NightSupermarket.Game
         private void OnFilmed(CustomerBehavior who, SuspiciousActivityEvent report)
         {
             InfluencerClips++;
+            Stream?.Spike(2500 + lifeRandom.Next(4000));
             Viral?.Invoke(who);
         }
 
@@ -197,22 +207,71 @@ namespace NightSupermarket.Game
             if (!job.Zone.HasValue) return;
             bool staffOnly = !ZoneAccess.Customer.Allows(job.Zone.Value);
             int mask = staffOnly ? NavMesh.AllAreas : NavigationAreas.CivilianMask;
+            BuildRing(spot, job.Zone.Value, job.Index, new[] { 1.6f, 2.3f, 3.0f }, 6, mask, job.Points);
+        }
+
+        /// <summary>
+        /// Standing room facing <paramref name="spot"/>: rings at the given radii on open floor of <paramref name="zone"/>,
+        /// checked like sale spots, never closer than <see cref="JobPressure.KeepClear"/>.
+        /// </summary>
+        private void BuildRing(Vector3 spot, ZoneType zone, int group, float[] radii, int max, int mask, List<NavigationPoint> into)
+        {
             var taken = new List<Vector3>();
-            foreach (var p in directory.Points) if ((p.Position - spot).sqrMagnitude < 16f) taken.Add(p.Position);
-            foreach (float radius in new[] { 1.6f, 2.3f, 3.0f })
-                for (int a = 0; a < 10 && job.Points.Count < 6; a++)
+            foreach (var p in directory.Points) if ((p.Position - spot).sqrMagnitude < 36f) taken.Add(p.Position);
+            foreach (float radius in radii)
+                for (int a = 0; a < 12 && into.Count < max; a++)
                 {
-                    float angle = (a + radius) * 36f * Mathf.Deg2Rad;
+                    float angle = (a + radius) * 30f * Mathf.Deg2Rad;
                     Vector3 at = spot + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
-                    if (!ClearFor(at, job.Zone.Value, taken, mask, out var stand)) continue;
+                    if (!ClearFor(at, zone, taken, mask, out var stand)) continue;
                     if ((Flat(stand) - Flat(spot)).sqrMagnitude < JobPressure.KeepClear * JobPressure.KeepClear) continue;
                     Vector3 look = spot - stand; look.y = 0;
                     float yaw = look.sqrMagnitude > 0.01f ? Quaternion.LookRotation(look).eulerAngles.y : 0f;
-                    var point = directory.AddPoint(job.Zone.Value, PointKind.Linger, stand, yaw);
-                    point.group = job.Index;
-                    job.Points.Add(point); taken.Add(stand);
+                    var point = directory.AddPoint(zone, PointKind.Linger, stand, yaw);
+                    point.group = group;
+                    into.Add(point); taken.Add(stand);
                 }
         }
+
+        // ---------------- attractions (a fashion show, a birthday cake) ----------------
+
+        private readonly Dictionary<int, List<NavigationPoint>> attractions = new Dictionary<int, List<NavigationPoint>>();
+
+        /// <summary>Makes standing room round something worth watching; returns how many spots it got.</summary>
+        public int AddAttraction(int group, Vector3 center, float[] radii, int max)
+        {
+            if (!attractions.TryGetValue(group, out var list)) attractions[group] = list = new List<NavigationPoint>();
+            var zone = directory.ZoneAt(center);
+            if (!zone.HasValue) return 0;
+            BuildRing(center, zone.Value, group, radii, max, NavigationAreas.CivilianMask, list);
+            return list.Count;
+        }
+
+        /// <summary>Sends up to <paramref name="max"/> people within <paramref name="within"/> m to watch for <paramref name="seconds"/>.</summary>
+        public int Gather(int group, Vector3 center, float within, int max, double seconds, System.Func<CustomerBehavior, bool> who = null)
+        {
+            if (!attractions.TryGetValue(group, out var list) || list.Count == 0 || !population.Authority) return 0;
+            var zone = list[0].zone;
+            int sent = 0;
+            foreach (var npc in population.Active)
+            {
+                if (sent >= Mathf.Min(max, list.Count)) break;
+                if (!(npc.Behavior is CustomerBehavior c) || c.Brain == null || c.Following) continue;
+                if (who != null && !who(c)) continue;
+                Vector3 d = npc.transform.position - center;
+                if (Mathf.Abs(d.y) > 1.5f || d.x * d.x + d.z * d.z > within * within) continue;
+                if (c.Brain.Linger(zone, group, seconds)) sent++;
+            }
+            return sent;
+        }
+
+        public void Release(int group)
+        {
+            foreach (var npc in population.Active)
+                if (npc.Behavior is CustomerBehavior c && c.Brain != null && c.Brain.LingerGroup == group) c.Brain.MoveOn();
+        }
+
+        public int Watching(int group) => Lingerers(group);
 
         /// <summary>Like a sale spot's check, on the given NavMesh areas.</summary>
         private bool ClearFor(Vector3 at, ZoneType zone, List<Vector3> taken, int mask, out Vector3 spot)
@@ -328,11 +387,32 @@ namespace NightSupermarket.Game
                 var door = directory.Pick(PointKind.Spawn, null, ZoneAccess.Customer, lifeRandom, -1);
                 if (door != null)
                 {
-                    influencer = population.Spawn(NpcRole.Customer, door.Position, door.transform.eulerAngles.y, false, ShopperArchetypes.Influencer(), ShopperKind.Influencer);
-                    influencerId = influencer.Id;
-                    toast?.Invoke("An influencer just walked in, filming everything. Their red light sees through any crowd: freeze when it sweeps over you.", 5f);
+                    StartStream(door.Position, door.transform.eulerAngles.y, false);
+                    toast?.Invoke("An influencer is LIVE in the mall. The red fan on the floor is their shot: move in it and you go viral — hold a pose in it for a shout-out.", 5.5f);
                 }
             }
+        }
+
+        /// <summary>
+        /// An influencer goes live here: the streamer with their tag, likes and shot on the floor, and two fans who tag
+        /// along, phones up, filming the filmer. The night calls it when one walks in; tests and captures call it directly.
+        /// </summary>
+        public NpcController StartStream(Vector3 at, float yaw, bool alreadyInside)
+        {
+            influencer = population.Spawn(NpcRole.Customer, at, yaw, alreadyInside, ShopperArchetypes.Influencer(), ShopperKind.Influencer);
+            if (influencer == null) return null;
+            influencerId = influencer.Id;
+            var look = influencer.GetComponent<ShopperLook>();
+            LiveStream.Attach(influencer, look != null ? look.CameraLight : null);
+            var lead = influencer.Behavior as CustomerBehavior;
+            var rotation = Quaternion.Euler(0f, yaw, 0f);
+            for (int f = 0; f < 2 && lead != null && population.Customers < population.Cap; f++)
+            {
+                Vector3 spot = at + rotation * new Vector3(f == 0 ? -0.7f : 0.7f, 0f, -0.6f);
+                if (UnityEngine.AI.NavMesh.SamplePosition(spot, out var onFloor, 0.6f, UnityEngine.AI.NavMesh.AllAreas)) spot = onFloor.position; else spot = at;
+                population.Spawn(NpcRole.Customer, spot, yaw, alreadyInside, ShopperArchetypes.PhoneZombie(), ShopperKind.PhoneZombie, lead);
+            }
+            return influencer;
         }
 
         private void SpawnCrew(ShopperKind kind)

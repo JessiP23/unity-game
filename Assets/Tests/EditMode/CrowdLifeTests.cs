@@ -146,7 +146,7 @@ namespace NightSupermarket.Tests
             string row = m.Row("2026-10-13 21:00", 286, true);
             Assert.That(row.Split(',').Length, Is.EqualTo(CrowdMetrics.Header.Split(',').Length));
             Assert.That(row, Does.Contain("Rush hour"));
-            Assert.That(row, Does.EndWith("12 30 0"));
+            Assert.That(row, Does.EndWith("12 30 0,Tonight's shift"));
         }
     }
 
@@ -189,6 +189,65 @@ namespace NightSupermarket.Tests
             brain.Unreachable();
             Assert.That(brain.Lingering, Is.False, "nowhere to stand: carry on, skipping nothing");
             Assert.That(list.Done, Is.False);
+        }
+    }
+}
+
+namespace NightSupermarket.Tests
+{
+    public sealed class NightKindTests
+    {
+        [Test] public void SpecialNightsOpenUpAsYouPlayAndOneIsFeaturedEachDay()
+        {
+            Assert.That(NightKinds.Unlocked(NightKind.Regular, 0), Is.True);
+            Assert.That(NightKinds.Unlocked(NightKind.Blackout, 0), Is.False);
+            Assert.That(NightKinds.Unlocked(NightKind.Blackout, 1), Is.True);
+            Assert.That(NightKinds.Unlocked(NightKind.Heist, 3), Is.False);
+            Assert.That(NightKinds.Unlocked(NightKind.Heist, 4), Is.True);
+            var seen = new System.Collections.Generic.HashSet<NightKind>();
+            for (int day = 280; day < 284; day++) seen.Add(NightKinds.Featured(day));
+            Assert.That(seen.Count, Is.EqualTo(4), "four days, four different featured nights");
+            Assert.That(NightKinds.Featured(-3), Is.Not.EqualTo(NightKind.Regular));
+        }
+
+        [Test] public void EachNightChangesOneBigThing()
+        {
+            Assert.That(NightKinds.CrowdFactor(NightKind.BlackFriday), Is.GreaterThan(1.5));
+            Assert.That(NightKinds.Sales(NightKind.BlackFriday, 2), Is.EqualTo(4));
+            Assert.That(NightKinds.Sales(NightKind.Regular, 3), Is.EqualTo(3), "an ordinary night keeps the shift's sales");
+            Assert.That(NightKinds.Lighting(NightKind.Blackout, LightingMode.Normal), Is.EqualTo(LightingMode.Dark));
+            Assert.That(NightKinds.Lighting(NightKind.Blackout, LightingMode.Emergency), Is.EqualTo(LightingMode.Emergency));
+            Assert.That(NightKinds.Lighting(NightKind.Heist, LightingMode.Normal), Is.EqualTo(LightingMode.Normal));
+            Assert.That(NightKinds.BlackoutSight(true).range, Is.GreaterThan(NightKinds.BlackoutSight(false).range));
+            foreach (var kind in NightKinds.Specials) { Assert.That(NightKinds.Name(kind), Is.Not.Empty); Assert.That(NightKinds.Describe(kind), Is.Not.Empty); }
+        }
+
+        [Test] public void TheShowComesRoundEveryMinuteWithAWarning()
+        {
+            Assert.That(NightKinds.ShowAt(10, out _), Is.EqualTo(SaleStage.None));
+            Assert.That(NightKinds.ShowAt(31, out double until), Is.EqualTo(SaleStage.Announced));
+            Assert.That(until, Is.EqualTo(4).Within(1e-9));
+            Assert.That(NightKinds.ShowAt(40, out until), Is.EqualTo(SaleStage.Open));
+            Assert.That(until, Is.EqualTo(15).Within(1e-9));
+            Assert.That(NightKinds.ShowAt(70, out _), Is.EqualTo(SaleStage.None));
+            Assert.That(NightKinds.ShowAt(91, out _), Is.EqualTo(SaleStage.Announced));
+            Assert.That(NightKinds.ShowAt(96, out _), Is.EqualTo(SaleStage.Open));
+        }
+
+        [Test] public void DoorbustersNeverOverlap()
+        {
+            for (int shift = 1; shift < 60; shift++)
+            {
+                var sales = CrowdPlan.SalesFor(shift, 4);
+                Assert.That(sales.Count, Is.EqualTo(4));
+                for (int i = 1; i < 4; i++)
+                {
+                    double previousEnds = (1 - sales[i - 1].OpensAt) * 360 + sales[i - 1].Seconds;
+                    double announced = (1 - sales[i].OpensAt) * 360 - CrowdPlan.AnnounceSeconds;
+                    Assert.That(announced, Is.GreaterThan(previousEnds));
+                }
+            }
+            Assert.That(CrowdPlan.SalesFor(5, 1).Count, Is.EqualTo(1));
         }
     }
 }

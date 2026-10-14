@@ -167,6 +167,52 @@ namespace NightSupermarket.Game
             ArtLibrary.Spawn("ceramic_vase_01", parent, new Vector3(rug.x + 0.2f, y + 0.42f, rug.z), 0);
         }
 
+        /// <summary>
+        /// The upstairs gallery beyond the lounge: a games demo where shoppers stop to watch, a shelf unit of homeware
+        /// by the east wall, plants in the corners. Every piece sits clear of the walkways the shoppers and the guard use.
+        /// </summary>
+        public static void Gallery(Transform parent, StoreLighting lighting, Random rng)
+        {
+            float up = PrimitiveWorld.UpstairsY;
+            // Games demo by the balcony rail, screen toward the gallery.
+            var stand = Solid(ArtLibrary.Spawn("drawer_cabinet", parent, new Vector3(6.6f, up, 5.7f), 0));
+            if (stand != null)
+            {
+                float top = ArtLibrary.BoundsOf(stand).max.y;
+                var tv = ArtLibrary.Spawn("Television_01", parent, new Vector3(6.6f, top, 5.62f), 0);
+                if (tv != null) FitScreen(parent, tv, Vector3.forward, 0.56f, ArtLibrary.Screen(new Color(0.45f, 1f, 0.55f), ArtLibrary.ScreenShow.Broadcast, 7));
+                ArtLibrary.Spawn("gaming_console", parent, new Vector3(7.25f, top, 5.7f), 15);
+            }
+            Solid(ArtLibrary.Spawn("Ottoman_01", parent, new Vector3(6.6f, up, 7.05f), 180));
+            ArtLibrary.Spawn("gamepad", parent, new Vector3(6.75f, up + 0.42f, 7.0f), 160);
+            Sign(parent, "PLAY ME · GAMES DEMO", new Vector3(6.6f, up + 2.05f, 5.4f), 180f, 0.09f, Electronica, Color.white, true, 0.9f);
+            lighting.AddGlow(new Vector3(6.6f, up + 1.5f, 6.4f), new Color(0.45f, 1f, 0.6f), 3.5f, 0.6f);
+            // Homeware shelves against the east wall, south of the lounge.
+            var unit = new GameObject("Gallery shelf unit").transform;
+            unit.SetParent(parent, false);
+            unit.localPosition = new Vector3(14.45f, up, 6.5f);
+            unit.localRotation = Quaternion.Euler(0, -90, 0);
+            Solid(ArtLibrary.Spawn("wooden_display_shelves_01", unit, Vector3.zero, 0));
+            string[] decor = { "ceramic_vase_01", "ceramic_vase_02", "ceramic_vase_03", "mantel_clock_01", "standing_picture_frame_01", "throw_pillows_01" };
+            foreach (float level in new[] { 0.38f, 0.80f, 1.16f, 1.56f }) Stock(unit, level, 0.46f, 0.14f, decor, rng);
+            // Plants soften the corners.
+            Solid(ArtLibrary.Spawn("potted_plant_02", parent, new Vector3(14.35f, up, 5.45f), 30));
+            Solid(ArtLibrary.Spawn("potted_plant_01", parent, new Vector3(3.55f, up, 5.55f), 200));
+            Solid(ArtLibrary.Spawn("potted_plant_01", parent, new Vector3(14.35f, up, 13.6f), 80));
+            // A warm lamp over the lounge, where the catalogue photo is taken.
+            lighting.AddGlow(new Vector3(11.8f, up + 2.4f, 10.5f), new Color(1f, 0.82f, 0.6f), 6f, 0.9f);
+        }
+
+        /// <summary>Upstairs structure dressing that needs no art: the wall band and the balcony sign the sales floor can read.</summary>
+        public static void GalleryShell(Transform parent, StoreLighting lighting)
+        {
+            float up = PrimitiveWorld.UpstairsY;
+            var band = ArtLibrary.Lit(new Color(0.18f, 0.72f, 0.86f), 0.25f);
+            Panel(parent, "Gallery wall band", new Vector3(8f, up + 2.25f, 14.73f), new Vector3(14f, 0.26f, 0.02f)).sharedMaterial = band;
+            Panel(parent, "Gallery wall band", new Vector3(14.73f, up + 2.25f, 9.5f), new Vector3(0.02f, 0.26f, 9.4f)).sharedMaterial = band;
+            Sign(parent, "THE GALLERY · HOME & ELECTRONICS", new Vector3(9f, up + 1.42f, 5.04f), 0f, 0.15f, Electronica, Color.white, true, 1.1f);
+        }
+
         public static void LivingRoom(Transform parent)
         {
             Solid(ArtLibrary.Spawn("sofa_02", parent, new Vector3(14.1f, 0, 0), -90));

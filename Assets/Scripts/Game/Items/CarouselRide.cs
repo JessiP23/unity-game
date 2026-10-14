@@ -13,7 +13,7 @@ namespace NightSupermarket.Game
     public sealed class CarouselRide : MovingSurface
     {
         public const float Radius = 3.2f, PlatformHeight = 0.22f; // under the controller's step height: you walk on
-        public float RunSeconds = 28f, RestSeconds = 10f, TopSpeed = 12f; // degrees per second
+        public float RunSeconds = 28f, RestSeconds = 10f, TopSpeed = 18f; // degrees per second: one turn in 20 s, so a whole turn fits in one run
         public bool Running { get; private set; } = true;
         /// <summary>Current angular speed in degrees per second; ramps over two seconds either way.</summary>
         public float Speed { get; private set; }
@@ -22,6 +22,13 @@ namespace NightSupermarket.Game
         public HoldSpot Ride { get; private set; }
         private float phaseLeft;
         private Transform[] horses = new Transform[0];
+        private readonly System.Collections.Generic.List<SeatSpot> seats = new System.Collections.Generic.List<SeatSpot>();
+        public System.Collections.Generic.IReadOnlyList<SeatSpot> Seats => seats;
+        /// <summary>Someone sitting on a horse right now (for the ride job, which starts by itself).</summary>
+        public PlayerMotor FirstRider
+        {
+            get { foreach (var s in seats) { var r = s.FirstRider; if (r != null) return r; } return null; }
+        }
         private Renderer[] bulbs = new Renderer[0];
         private Material bulbOn, bulbOff;
         private AudioSource music;
@@ -118,6 +125,15 @@ namespace NightSupermarket.Game
                     }
                 }
                 else PrimitiveHorse(horse, ArtLibrary.Lit(tints[i] * 0.95f, 0.6f), red, body);
+                // A saddle to sit on, just behind the pole: as high as the model's back is there.
+                // The seat lives on the horse's body (its collider is what you aim at), placed in the horse's own space.
+                var seatSpot = body.AddComponent<SeatSpot>();
+                seatSpot.Style = SeatStyle.Astride; seatSpot.Surface = ride; seatSpot.What = "the horse";
+                var saddle = seatSpot.AddSeat(Vector3.zero, Quaternion.identity, PlayerMotor.SaddleDrop);
+                saddle.localScale = new Vector3(1f / body.transform.localScale.x, 1f / body.transform.localScale.y, 1f / body.transform.localScale.z);
+                saddle.position = horse.TransformPoint(new Vector3(0f, SaddleHeight(model, horse, new Vector3(0f, 0f, -0.24f)), -0.24f));
+                saddle.rotation = horse.rotation;
+                ride.seats.Add(seatSpot);
                 var pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 pole.name = "Pole"; Object.Destroy(pole.GetComponent<Collider>());
                 pole.transform.SetParent(horse, false);
@@ -141,6 +157,25 @@ namespace NightSupermarket.Game
             ride.music.Play();
             ride.Paint();
             return ride;
+        }
+
+        /// <summary>Top of the horse model's back at a point (horse space), from its own vertices; 1.25 m without the model.</summary>
+        private static float SaddleHeight(GameObject model, Transform horse, Vector3 at)
+        {
+            float best = float.MinValue;
+            if (model != null)
+                foreach (var filter in model.GetComponentsInChildren<MeshFilter>())
+                {
+                    var mesh = filter.sharedMesh;
+                    if (mesh == null || !mesh.isReadable) continue;
+                    var toHorse = horse.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+                    foreach (var v in mesh.vertices)
+                    {
+                        Vector3 p = toHorse.MultiplyPoint3x4(v);
+                        if ((p.x - at.x) * (p.x - at.x) + (p.z - at.z) * (p.z - at.z) < 0.15f * 0.15f && p.y > best) best = p.y;
+                    }
+                }
+            return best > 0.6f && best < 1.8f ? best + 0.02f : 1.25f;
         }
 
         private static GameObject Cylinder(Transform parent, string name, Vector3 at, float radius, float height, Material material, bool collider)

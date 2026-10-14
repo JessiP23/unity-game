@@ -90,7 +90,9 @@ namespace NightSupermarket.Game
             {
                 var body = list[i];
                 if (body == null || !body.Record.Free) continue;
-                bool inside = Covers(body.transform.position);
+                // Crouched, the camera aims at a lower body (low cover blocks it); hidden in a spot, it sees nothing.
+                var seen = body.GetComponent<PerceptionTarget>();
+                bool inside = (seen == null || !seen.Hidden) && Covers(body.transform.position - (body.Crouched ? Vector3.up * 0.45f : Vector3.zero));
                 if (!inside) { movingSince.Remove(body); continue; }
                 if (warned.Add(body)) firstSeen?.Invoke(body);
                 bool moving = body.ActualSpeed > body.Rules.movementThreshold;

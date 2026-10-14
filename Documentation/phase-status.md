@@ -26,6 +26,8 @@
 | Redesign 7 | Real fountain with wish, carousel models, Clothing try-on and E badge, fitted screens, plank capture, photo booth, nightly dare and streak | Compiled, 80 Core tests pass 2026-10-11; MallPolishTests and new art need a Mac run. See redesign.md |
 | Redesign 8 | Busier mall: 10–20 shoppers growing 10% a night to +80%, group arrivals, two flash sales a night on tonight's job departments, live frame-rate budget up to 40, crowd LOD | Compiled, 91 Core tests pass 2026-10-12; MallCrowdTests (PlayMode) need a Mac run. See redesign.md |
 | Redesign 9 | Hide in the crowd, crowds at jobs with quiet windows, heat map and job crowd chip, families/phone zombies/influencer/cleaners/restockers, shift card (Relaxed/Normal/Rush hour), night metrics | Compiled, 104 Core tests pass 2026-10-13; MallCrowdLifeTests (PlayMode) need a Mac run. See redesign.md |
+| Redesign 10 | Crouch and hiding spots, main menu, settings (volume, mouse, graphics, full screen), four special nights (Blackout, Kids' birthday party, Black Friday, Jewellery heist) and a featured night | Compiled, 108 Core tests pass 2026-10-13; MallNightsTests (PlayMode) need a Mac run. See redesign.md |
+| Redesign 11 | Sit on carousel horses, sofas and benches; the ride counts a whole turn; speech bubbles readable from any side (player camera is MainCamera); live stream tag, shot, fans and shout-outs; the upstairs gallery dressed, with TV-channel and catalogue-photo jobs | Compiled, 108 Core tests pass 2026-10-14; MallSeatsTests (PlayMode) need a Mac run. See redesign.md |
 | Art | Models, environment, animations, audio, UI | After programming acceptance |
 | Polish | Final refinement | After asset integration |
 

@@ -32,13 +32,18 @@ shutter drops at lockdown the fire exit up there is the only way out.
 
 The supermarket sits in a small night mall: the front doors open onto an atrium (fountain, benches,
 two security cameras — don't move in the red light) and the toy store beyond it, where the carousel
-turns: ride it in the Display pose and nobody counts you as moving. The escalator carries you up (and
+turns: climb on a horse (E) and nobody counts you as moving. Sofas, armchairs and benches are seats too (E). The escalator carries you up (and
 that counts as moving); the stairs beside it let you stop. The escape door is beside the mall doors.
 
-Before each night, clock in: Relaxed, Normal or Rush hour (unlocks after three nights; busier pays more).
+The game opens on the main menu: pick a night, a difficulty (Relaxed, Normal or Rush hour, which unlocks
+after three nights; busier pays more) and clock in. Special nights open as you play: Blackout, a kids'
+birthday party, Black Friday and a jewellery heist (steal the diamond during the fashion show and escape
+with it); one is featured each day for ×1.25. SETTINGS has volume, mouse, graphics and full screen.
+Crouch with Ctrl or Option: you are lower and slower, and crouched still in a hiding spot (a soft ring by
+low cover) nobody can see you unless the guard walks right up.
 Walk WITH a group of shoppers and they hide you; running gives you away. People gather at your jobs, but
 every job goes quiet for 15 s about once a minute — the job card under NEXT counts it down. Watch for
-kids (they point), the influencer's red camera light, and cleaners' wet floors (don't run on them).
+kids (they point), the influencer's red shot on the floor (hold a pose in it for a shout-out), and cleaners' wet floors (don't run on them).
 The mall gets busier the more nights you play, and twice a night a FLASH SALE floods one department —
 usually one your jobs are in. Watch the countdown under the clock and plan around the crowd.
 Every night has a dare (Tab, Night page) worth points and a gem; do the daily shift's dare on

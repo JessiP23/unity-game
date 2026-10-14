@@ -167,6 +167,100 @@ Now a night leaves something behind you can see and use the next night.
   to the fire exit, the ramp's height halfway up, gems on walkable floor and not inside fixtures, dark
   before lights out and lit after, the shutter down and the front door blocked after lockdown.
 
+## Eleventh pass — sit and ride, readable speech, a real live stream, and a gallery worth climbing to
+
+From the first full playtest of the tenth pass (86/88 PlayMode tests; the TV test's two sets overlapped).
+
+### Sit down: carousel horses, sofas, armchairs, benches (`SeatSpot`, `Seating`)
+
+- **E on a carousel horse climbs on.** You sit astride the saddle, hands on the pole, carried round with the
+  horse's bob; riding never counts as moving, and a mannequin on a horse passes for a display pose. E or any move
+  key climbs down onto the deck (inside the ring of horses, else outside it). Caught while riding, you are put
+  down beside the horse, never inside it.
+- **The ride job counts a whole turn** in degrees the ride turns with you on it (sitting on a horse, or standing
+  on the deck in the Display pose). A stop pauses the count; walking about on the ride costs half. The ride now
+  turns at 18°/s, so a turn (20 s) fits in one 28 s run. Before, a turn took 30 s and the run lasted 28 s, so
+  standing on it "for one full turn" could never finish.
+- **Sofas, armchairs, ottomans and the atrium benches are seats.** Seat heights come from each model's own
+  cushion (its vertices, read before static batching merges them). Seated, your eyes are low, watchers aim at a
+  lower chest, and a seated mannequin on display furniture passes for a display pose.
+
+### Speech bubbles you can always read
+
+No camera was tagged `MainCamera`, so `Camera.main` was null: bubbles never turned to face you (their text only
+showed from behind the shopper) and the crowd's level of detail never ran. The player's view is now tagged,
+`ViewCameras.Current` is used everywhere, and bubbles are printed on both faces.
+
+### The live stream (`LiveStream`)
+
+- A red "● LIVE 2.4k" tag over the influencer's head, likes floating up from the phone, and a faint red fan on
+  the floor that is exactly their shot (10 m, 70°: their eyes use the same numbers).
+- Two fans follow the influencer, phones up.
+- Move in the shot and you go viral, as before. **Hold a pose in the shot for 2.2 s for a shout-out** (+350, once
+  per stream, a photo). The cover chip turns red: "● IN THE LIVE SHOT", "● ON THE STREAM · shout-out in 2s",
+  "● LIVE 9 m away".
+
+### The gallery upstairs
+
+- Dressing: a balcony sign the sales floor can read ("THE GALLERY · HOME & ELECTRONICS"), a games demo by the
+  rail with an ottoman where shoppers stop to watch, a homeware shelf unit, plants, a wall band and two warm lights.
+- **New job "Switch three gallery TVs to the mannequin channel"** (family `tv`): E on three marked TVs on the
+  gallery wall, 2 s still each; each one switched shows the store's camera feed.
+- **New job "Sit for the catalogue photo on the gallery sofa"** (family `sit`): sit on the sofa and keep still
+  15 s while the photographer's flash goes off.
+
+### Tests
+
+- PlayMode `MallSeatsTests`: a horse carries its rider without counting as movement and the ride counts degrees;
+  move climbs down onto the deck; every seat's stand-up point is open floor, there are four benches and seats
+  upstairs, sitting starts the photo and E stands you up; a TV channel switches and counts; the player's view is the
+  main camera; the live stream's tag, fans, sight and a single shout-out.
+- `ScreensSitOnTheirTelevisions` now spawns each TV on its own spot (the second ray was hitting the first TV).
+- New captures: `gallery`, `gallery_demo`, `carousel_rider`, `sofa_sit`, `live_stream`, `live_tag`.
+
+## Tenth pass — crouch and hide, a real main menu, settings, and four special nights
+
+### Crouch and hiding spots
+
+- **Crouch** with Ctrl (either side) or Option/Alt. You drop to 1.15 m, walk at 45% pace, can't sprint or
+  jump, and watchers and cameras aim at your chest height, so counters, planters and sofa backs block them.
+  You only stand back up where there is headroom. A held pose keeps the crouch.
+- **Hiding spots** (`HideSpot`, `HidingPlaces`). Found once the world settles: open floor tucked against
+  cover between 0.6 and 1.4 m tall, with nothing tall right above it (a shelf wall is not cover), and room
+  to stand back up. At most 16 in the mall, 3 per department, 5 m apart. Within 5 m a soft ring shows the
+  spot; crouch and keep still in it for 0.35 s and the ring turns green: shoppers, staff and cameras
+  can't see you, and the guard only finds you within 1.6 m. The badge says "HIDDEN".
+
+### Main menu and settings
+
+- The shift card is now the **main menu**: NIGHT MALL, a row of five night cards (locked ones say when
+  they open, today's featured night pays ×1.25), the difficulty row, SETTINGS (S), CLOCK IN (Enter) and
+  QUIT. N / ↑ / ↓ step the night; your last night and difficulty are remembered.
+- **Settings** (`GameSettings`, `SettingsPanel`; also the 7th Tab page): volume, mouse sensitivity, invert
+  mouse, graphics (Low / Medium / High: shadows, anti-aliasing, post-processing per camera, and a crowd
+  ceiling of 24 / 32 / 40) and full screen. Saved as you change them; test runs ignore saved settings.
+
+### Special nights (`NightKinds`, `ScenarioDirector`)
+
+| Night | Opens after | What changes | Score |
+| --- | --- | --- | --- |
+| Blackout | 1 night | Lights out all night, the guard's torch on; shoppers see 3 m (70°), 8 m with a phone torch (45% carry one, at most 7 lit); fewer people. | ×1.15 |
+| Kids' birthday party | 2 nights | Party table, cake and balloons in the toy store, 8 party kids (they see everything). Every minute it's CAKE TIME: the kids rush the table for 20 s. Grab the present (hold E, 2.5 s, +600). | ×1.1 |
+| Black Friday | 3 nights | 70% more shoppers, eight walk in at once, four 30 s doorbusters through the night. | ×1.2 |
+| Jewellery heist | 4 nights | A fashion runway east or west of the fountain and a diamond case. Every minute the show draws the crowd for 20 s; lift the diamond then (hold E, 3.5 s; it sets off an alarm). It pays +1000 only if you escape with it; caught, it goes back in the case. | ×1 |
+
+The featured night rotates with the daily shift. Night metrics gain a `night` column; an older
+`crowd-metrics.csv` with the old header is renamed aside and a fresh one started.
+
+### Tests
+
+- EditMode `NightKindTests`: unlocks and featured night, crowd/score/sales/lighting rules, show timing,
+  doorbusters never overlapping.
+- PlayMode `MallNightsTests`: crouching is low, slow and lower to watchers; hiding spots sit on open floor
+  and hide you only crouched and still; settings reach the game; each special night sets itself up
+  (Black Friday's doorbusters, the Blackout's dark and short sight, the heist's diamond paying only on
+  escape and returning when caught, the party filling the toy store and cake time pulling the kids).
+
 ## Ninth pass — a crowd you can read, hide in and plan around
 
 Built from the plan agreed after the eighth pass: more people must make every job harder **and** give the

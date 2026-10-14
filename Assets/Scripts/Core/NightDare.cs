@@ -37,7 +37,7 @@ namespace NightSupermarket.Core
         public static string Describe(Dare dare) => dare switch
         {
             Dare.Selfie => "Get a shopper to take your photo: hold a pose near one.",
-            Dare.CarouselRide => "Ride the toy-store carousel for " + (int)CarouselSeconds + " seconds while it turns.",
+            Dare.CarouselRide => "Ride the toy-store carousel for " + (int)CarouselSeconds + " seconds while it turns (E on a horse to climb on).",
             Dare.Wish => "Toss a coin in the atrium fountain, then escape.",
             Dare.Unreported => "Escape without a single report from a shopper or a camera.",
             Dare.AllGems => "Find every hidden gem tonight (they glint after lights out).",

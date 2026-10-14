@@ -28,8 +28,12 @@ namespace NightSupermarket.Game
         {
             if (!player.Record.Free) { Observed = false; return; }
             var lamp = Flashlight != null ? Flashlight.Model : null;
+            var target = player.GetComponent<PerceptionTarget>();
+            float aim = target != null ? target.aimHeight : 1f;
             bool visible = vision.Observed(guard.position + Vector3.up * GuardVisionSystem.EyeHeight, guard.forward,
-                player.transform.position + Vector3.up, player.transform, lamp);
+                player.transform.position + Vector3.up * aim, player.transform, lamp);
+            // Tucked into a hiding spot: only a guard right on top of you finds you.
+            if (visible && target != null && target.Hidden && (guard.position - player.transform.position).sqrMagnitude > HideSpot.FoundWithin * HideSpot.FoundWithin) visible = false;
             Observed = visible;
             double speed = Twitch ? player.Rules.movementThreshold * 4 : player.ActualSpeed;
             Twitch = false;

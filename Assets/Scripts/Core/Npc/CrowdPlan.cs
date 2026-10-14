@@ -75,6 +75,16 @@ namespace NightSupermarket.Core
         public static IReadOnlyList<FlashSale> SalesFor(int shift, int count = 2)
         {
             var random = new Random(shift * 6007 + 17);
+            if (count >= 4)
+                return new[]
+                {
+                    // Black Friday doorbusters: short, sharp and one after another.
+                    new FlashSale(0.93 - random.NextDouble() * 0.02, DoorbusterSeconds, random.Next(1000)),
+                    new FlashSale(0.79 - random.NextDouble() * 0.02, DoorbusterSeconds, random.Next(1000)),
+                    new FlashSale(0.65 - random.NextDouble() * 0.02, DoorbusterSeconds, random.Next(1000)),
+                    new FlashSale(0.51 - random.NextDouble() * 0.02, DoorbusterSeconds, random.Next(1000)),
+                };
+            if (count == 1) return new[] { new FlashSale(0.8 - random.NextDouble() * 0.08, SaleSeconds, random.Next(1000)) };
             if (count >= 3)
                 return new[]
                 {
@@ -89,7 +99,7 @@ namespace NightSupermarket.Core
             };
         }
 
-        public const double RushSaleSeconds = 40;
+        public const double RushSaleSeconds = 40, DoorbusterSeconds = 30;
 
         /// <summary>The sale in progress or about to be called, if any, at this point of the night.</summary>
         public static SaleStage StageAt(IReadOnlyList<FlashSale> sales, double remaining, double duration, out int index, out double secondsLeft)

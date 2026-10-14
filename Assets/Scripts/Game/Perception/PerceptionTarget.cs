@@ -24,6 +24,8 @@ namespace NightSupermarket.Game
         public Vector3 AimPoint => transform.position + Vector3.up * aimHeight;
         /// <summary>Share of a watcher's suspicion the surrounding crowd absorbs (0–0.75), set by <see cref="CrowdCover"/>.</summary>
         public float Concealment { get; set; }
+        /// <summary>Crouched still in a hiding spot (see <see cref="HideSpot"/>): shoppers and staff cannot see you at all.</summary>
+        public bool Hidden { get; set; }
         private PlayerMotor motor;
         private void Awake() => motor = GetComponent<PlayerMotor>();
         private void FixedUpdate()

@@ -78,9 +78,12 @@ namespace NightSupermarket.Tests
             bench.position = new Vector3(200f, 0f, 200f);
             try
             {
-                foreach (var id in new[] { "Television_01", "television_02" })
+                var ids = new[] { "Television_01", "television_02" };
+                for (int i = 0; i < ids.Length; i++)
                 {
-                    var tv = ArtLibrary.Spawn(id, bench, Vector3.zero, 180f);
+                    string id = ids[i];
+                    // Each TV on its own spot: a ray at the second TV must not meet the first one.
+                    var tv = ArtLibrary.Spawn(id, bench, new Vector3(i * 4f, 0f, 0f), 180f);
                     Assert.That(tv, Is.Not.Null, id + " is missing from the art pack");
                     foreach (var filter in tv.GetComponentsInChildren<MeshFilter>())
                         if (filter.sharedMesh != null && filter.sharedMesh.isReadable) filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;

@@ -107,6 +107,7 @@ namespace NightSupermarket.Game
                     case "carousel-ride": BuildCarouselJob(); break;
                     case "top-shelf-robot": BuildRobot(); break;
                     case "fragile-vase": BuildVases(); break;
+                    case "tv-channel": BuildTvChannels(); break;
                 }
         }
 
@@ -114,6 +115,130 @@ namespace NightSupermarket.Game
         public void AfterDressing()
         {
             foreach (var job in Jobs) if (job.Id == "swap-places") BuildSwap();
+        }
+
+        /// <summary>Jobs that need the store's seats (found while dressing).</summary>
+        public void AfterSeating()
+        {
+            foreach (var job in Jobs) if (job.Id == "sofa-shoot") BuildSofaShoot();
+        }
+
+        // ---------------- upstairs: the gallery ----------------
+
+        private readonly List<HoldSpot> channels = new List<HoldSpot>();
+        private HoldSpot shoot;
+        private SeatSpot sofa;
+        private Light flash;
+        private float flashClock;
+        /// <summary>The catalogue photo's hold (the root ticks its flash).</summary>
+        public HoldSpot Shoot => shoot;
+
+        /// <summary>
+        /// Three of the four lower TVs on the gallery wall get a marked channel button. Each one switched shows the
+        /// store's own camera feed: by the end the wall is broadcasting the mannequin channel to the gallery.
+        /// </summary>
+        private void BuildTvChannels()
+        {
+            float up = PrimitiveWorld.UpstairsY;
+            var xs = new List<float> { 4.6f, 6.2f, 7.8f, 9.4f };
+            xs.RemoveAt(layout.Next(xs.Count));
+            int seed = 0;
+            foreach (float x in xs)
+            {
+                // An invisible box over the TV on the ledge: what you aim at with E. It is off the walkable floor (the ledge).
+                var target = PrimitiveWorld.Box(root, "TV channel", new Vector3(x, up + 1.33f, 13.95f), new Vector3(0.8f, 0.6f, 0.42f), Color.black);
+                target.layer = 3;
+                target.GetComponent<Renderer>().enabled = false;
+                var spot = target.AddComponent<HoldSpot>();
+                spot.Configure(authority, signals, ActionKind.Place, "tvchannel");
+                spot.Label = "Switching the channel"; spot.Seconds = 2f; spot.KeepOnCancel = 0f;
+                spot.StartHint = "E — switch this TV to the mannequin channel (2 s still)"; spot.DoneHint = "On the mannequin channel";
+                var button = PrimitiveWorld.Box(root, "Channel button", new Vector3(x + 0.3f, up + 1.07f, 13.76f), new Vector3(0.12f, 0.06f, 0.03f), Color.red);
+                UnityEngine.Object.DestroyImmediate(button.GetComponent<Collider>()); // gone before the NavMesh bakes
+                var light = button.GetComponent<Renderer>();
+                light.sharedMaterial = ArtLibrary.Emissive(new Color(1f, 0.25f, 0.2f), 2f);
+                var sign = ObjectiveDressing.Sign(root, "CH · E", new Vector3(x, up + 0.86f, 13.74f), 0f, DarkPanel, new Color(1f, 0.85f, 0.35f), 0.4f, 0.06f);
+                int show = seed++;
+                spot.Completed += _ =>
+                {
+                    light.sharedMaterial = ArtLibrary.Emissive(new Color(0.3f, 0.95f, 0.5f), 2f);
+                    var feed = ArtLibrary.Screen(new Color(0.85f, 0.95f, 1f), ArtLibrary.ScreenShow.Cctv, 20 + show);
+                    // Every screen on that TV (the fitted glow panel) takes the camera feed.
+                    foreach (var r in root.GetComponentsInChildren<Renderer>())
+                    {
+                        if (r.name != "TV screen") continue;
+                        Vector3 p = r.bounds.center;
+                        if (Mathf.Abs(p.x - x) < 0.5f && Mathf.Abs(p.y - (up + 1.33f)) < 0.45f && p.z > 13f) r.sharedMaterial = feed;
+                    }
+                    if (sign != null) sign.gameObject.SetActive(false);
+                    int left = 0; foreach (var c in channels) if (!c.Complete) left++;
+                    Toast(left > 0 ? "Channel switched. " + left + " to go." : "The whole wall is on the mannequin channel. The gallery is watching you.");
+                };
+                channels.Add(spot);
+            }
+        }
+
+        /// <summary>
+        /// The catalogue photo: sit on the gallery sofa and keep still while a photographer's flash goes off. Without
+        /// the art pack (no sofa model) a plain upholstered bench stands in.
+        /// </summary>
+        private void BuildSofaShoot()
+        {
+            float up = PrimitiveWorld.UpstairsY;
+            foreach (var s in SeatSpot.All)
+                if (s != null && s.Style == SeatStyle.Chair && s.What == "the sofa" && s.transform.position.y > up - 0.5f) { sofa = s; break; }
+            if (sofa == null)
+                foreach (var t in root.GetComponentsInChildren<Transform>())
+                    if (t.name == "sofa_02" && t.position.y > up - 0.5f) { sofa = Seating.SofaFromCollider(t); if (sofa != null) break; }
+            if (sofa == null)
+            {
+                var bench = PrimitiveWorld.Box(root, "Gallery sofa", new Vector3(13.7f, up + 0.23f, 10.5f), new Vector3(1.9f, 0.46f, 0.8f), new Color(0.45f, 0.35f, 0.3f));
+                bench.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
+                var obstacle = bench.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+                obstacle.shape = UnityEngine.AI.NavMeshObstacleShape.Box; obstacle.size = Vector3.one; obstacle.carving = true;
+                sofa = Seating.SeatsOn(bench.transform, Vector3.left, "the sofa");
+            }
+            var host = new GameObject("Catalogue photo");
+            host.transform.SetParent(root, false);
+            host.transform.position = new Vector3(sofa.transform.position.x, up, sofa.transform.position.z);
+            shoot = host.AddComponent<HoldSpot>();
+            shoot.Configure(authority, signals, ActionKind.Place, "sofa");
+            shoot.Label = "Posing for the catalogue"; shoot.Seconds = 15f; shoot.KeepOnCancel = 0.5f; shoot.AutoStart = true;
+            shoot.Seek = () => sofa.FirstRider;
+            shoot.CanStart = player => player.SeatOwner == sofa;
+            shoot.Holds = player => player.SeatOwner == sofa;
+            shoot.HoldHint = "Sit on the sofa (E) for the photo";
+            shoot.StartHint = "E on the sofa to sit for the catalogue photo";
+            shoot.BlockedHint = shoot.StartHint;
+            shoot.DoneHint = "Catalogue cover — photo done";
+            shoot.MovedHint = "You moved in the shot — half the photo is lost";
+            // The photographer's camera on a tripod in front of the sofa, with its flash.
+            Vector3 front = sofa.Seats.Count > 0 ? sofa.Seats[0].forward : Vector3.left; front.y = 0f; front.Normalize();
+            Vector3 tripod = host.transform.position + front * 2.6f;
+            foreach (int leg in new[] { 0, 120, 240 })
+            {
+                var pole = PrimitiveWorld.Box(root, "Tripod leg", tripod + Quaternion.Euler(0f, leg, 0f) * Vector3.forward * 0.18f + Vector3.up * 0.65f, new Vector3(0.03f, 1.3f, 0.03f), new Color(0.15f, 0.15f, 0.16f));
+                UnityEngine.Object.Destroy(pole.GetComponent<Collider>());
+                pole.transform.rotation = Quaternion.LookRotation(front) * Quaternion.Euler(0f, leg, 8f);
+            }
+            var body = PrimitiveWorld.Box(root, "Photo camera", tripod + Vector3.up * 1.38f, new Vector3(0.22f, 0.16f, 0.14f), new Color(0.08f, 0.08f, 0.09f));
+            UnityEngine.Object.Destroy(body.GetComponent<Collider>());
+            body.transform.rotation = Quaternion.LookRotation(-front);
+            flash = new GameObject("Photo flash").AddComponent<Light>();
+            flash.transform.SetParent(root, false);
+            flash.transform.position = tripod + Vector3.up * 1.6f - front * 0.1f;
+            flash.type = LightType.Point; flash.range = 6f; flash.intensity = 0f; flash.color = new Color(0.95f, 0.97f, 1f); flash.shadows = LightShadows.None;
+            ObjectiveDressing.Sign(root, "CATALOGUE SHOOT · SIT ON THE SOFA (E)", tripod + Vector3.up * 2.05f, Quaternion.LookRotation(-front).eulerAngles.y, DarkPanel, new Color(1f, 0.85f, 0.35f), 0.4f, 0.08f);
+        }
+
+        /// <summary>The photographer's flash: a pop every few seconds while you pose for the catalogue.</summary>
+        public void TickGallery(float delta)
+        {
+            if (flash == null || shoot == null) return;
+            bool posing = shoot.Worker != null && !shoot.Complete && shoot.Holds != null && shoot.Holds(shoot.Worker);
+            flashClock = posing ? flashClock + delta : 0f;
+            float t = Mathf.Repeat(flashClock, 2.6f);
+            flash.intensity = posing && t > 2.3f && t < 2.42f ? 7f : 0f;
         }
 
         /// <summary>
@@ -274,16 +399,25 @@ namespace NightSupermarket.Game
             ride = carousel.Ride;
             ride.enabled = true;
             ride.Configure(authority, signals, ActionKind.Place, "carousel", "carousel");
-            ride.Label = "Riding"; ride.Seconds = carousel.RunSeconds - 3f; ride.KeepOnCancel = 0.5f; ride.AutoStart = true;
-            ride.CanStart = player => HeldPose(player) == Stance.Display && carousel.Speed > carousel.TopSpeed * 0.5f;
-            ride.Gate = () => carousel.Speed > carousel.TopSpeed * 0.5f;
-            ride.GateHint = "The ride has stopped. Hold the pose — you are a mannequin on a carousel now";
-            ride.StartHint = "Step on while it turns and hold the Display pose (right mouse)";
-            ride.BlockedHint = "Hold the Display pose while it turns (right mouse, scroll to pick Display)";
+            // One full turn, counted in degrees the ride actually turns with you on it: sit on a horse (E), or stand on
+            // the deck in the Display pose. A stop pauses the count; it never loses it. Walking about on the ride costs half.
+            ride.Label = "Riding"; ride.Seconds = 360f; ride.KeepOnCancel = 0.5f; ride.AutoStart = true;
+            ride.CanStart = player => OnHorse(player) || player.Surface == carousel;
+            ride.Seek = () => carousel.FirstRider;
+            ride.Rate = _ => carousel.Speed;
+            ride.Left = left => Mathf.CeilToInt(Mathf.Max(0f, left)) + "° of the turn to go";
+            ride.Holds = player => OnHorse(player) || HeldPose(player) == Stance.Display;
+            ride.HoldHint = "Climb on a horse (E), or hold the Display pose";
+            ride.Gate = () => carousel.Speed > 1f;
+            ride.GateHint = "The ride has stopped. Keep still — you are a mannequin on a carousel now";
+            ride.StartHint = "Climb on a horse (E) and ride one full turn";
+            ride.BlockedHint = "Climb on a horse (E) and ride one full turn";
             ride.DoneHint = "One full turn — ride done";
-            ride.MovedHint = "You moved on the ride — half the turn is lost";
-            ObjectiveDressing.Sign(root, "CAROUSEL · RIDE ONE TURN IN THE DISPLAY POSE", PrimitiveWorld.CarouselCentre + new Vector3(0f, 3.75f, -3.9f), 0f, new Color(0.55f, 0.15f, 0.15f), Color.white, 0.6f, 0.11f);
+            ride.MovedHint = "You walked about on the ride — half the turn is lost";
+            ObjectiveDressing.Sign(root, "CAROUSEL · CLIMB ON A HORSE (E) · RIDE ONE TURN", PrimitiveWorld.CarouselCentre + new Vector3(0f, 3.75f, -3.9f), 0f, new Color(0.55f, 0.15f, 0.15f), Color.white, 0.6f, 0.11f);
         }
+
+        private bool OnHorse(PlayerMotor player) => player.SeatOwner != null && player.SeatOwner.Surface == carousel;
 
         private void BuildRobot()
         {
@@ -565,6 +699,13 @@ namespace NightSupermarket.Game
                     return false;
                 case "carousel-ride":
                     at = PrimitiveWorld.CarouselCentre + Vector3.up * 0.3f; label = "CAROUSEL"; return true;
+                case "tv-channel":
+                    if (!Nearest(channels, motor, c => !c.Complete, out at, "TV · CH", ref label)) return false;
+                    at = new Vector3(at.x, PrimitiveWorld.UpstairsY + 0.3f, 13.3f); // on the floor in front of the wall
+                    return true;
+                case "sofa-shoot":
+                    if (sofa == null || sofa.Seats.Count == 0) return false;
+                    at = sofa.StandUpPoint(sofa.Seats[0]) + Vector3.up * 0.3f; label = "SOFA · PHOTO"; return true;
                 case "top-shelf-robot":
                     if (held != null || robot == null || !robot.gameObject.activeInHierarchy) return false;
                     // The robot is 3 m up; the marker stands on the floor in front of the stool you climb.

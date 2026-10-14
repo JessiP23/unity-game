@@ -54,11 +54,21 @@ namespace NightSupermarket.Game
         private CustomerPopulationManager population;
         private CrowdDirector crowd;
         public CrowdDirector Crowd => crowd;
+        /// <summary>Tonight's jobs as built in the store (tests read the holds and markers).</summary>
+        public JobBuilder Jobs => jobs;
+        private HidingPlaces hiding;
+        public HidingPlaces Hiding => hiding;
         /// <summary>The shift the player clocked in for (Relaxed, Normal, Rush hour). Test runs are always Normal.</summary>
         private Difficulty difficulty = Difficulty.Normal;
         public Difficulty Difficulty => difficulty;
         private ShiftCard shiftCard;
+        private SettingsPanel settingsPanel;
         private bool choosingShift;
+        private ScenarioDirector scenario;
+        public ScenarioDirector Scenario => scenario;
+        private NightKind nightKind = NightKind.Regular;
+        public NightKind Night => nightKind;
+        private bool featuredNight;
         private readonly CrowdMetrics metrics = new CrowdMetrics();
         private float metricsTimer;
         private NpcDebugOverlay npcDebug;
@@ -157,6 +167,7 @@ namespace NightSupermarket.Game
             rules.hearingRadius *= (float)guardProfile.Hearing;
             rules.flashlightCone = Mathf.Clamp(rules.flashlightCone * (float)guardProfile.Torch, 10f, 150f);
             careerBefore = PlayerPrefs.GetInt("ns-career", 0);
+            if (!testRun) GameSettings.Load(); // before the crowd is sized: graphics caps it
             var session = new LocalSession();
             authority = new LocalMatchAuthority(rules.CreateRules(), session);
             authority.TryBeginNight();
@@ -217,6 +228,7 @@ namespace NightSupermarket.Game
             }
             StoreDressing.Apply(transform, authority.Lighting.Mode, signals);
             jobs.AfterDressing();
+            jobs.AfterSeating();
             population = gameObject.AddComponent<CustomerPopulationManager>();
             // Real nights shop the whole mall; test runs keep the classic four departments their scenarios script.
             if (!testRun) population.Catalog = ShoppingCatalog.Mall;
@@ -234,13 +246,23 @@ namespace NightSupermarket.Game
             crowd.SetDifficulty(testRun ? Difficulty.Normal : difficulty);
             population.Populate();
             foreach (var pawn in pawns) pawn.Cover = CrowdCover.Attach(pawn.Motor, population);
+            scenario = gameObject.AddComponent<ScenarioDirector>();
+            scenario.Configure(crowd, population, directory, authority, signals, () => rules.matchDuration - authority.Clock.Remaining, rules.matchDuration,
+                Toast, (title, detail) => ShowBanner(title, detail, 3.2f, false), () => storeAudio);
+            scenario.Award = evt => { int pts = score.Add(evt); Toast(NightScore.Describe(evt) + "   +" + pts, 4f); };
+            hiding = gameObject.AddComponent<HidingPlaces>();
+            hiding.Configure(directory, () => motors);
             var debugHost = new GameObject("NPC debug");
             debugHost.transform.SetParent(transform, false);
             npcDebug = debugHost.AddComponent<NpcDebugOverlay>();
             npcDebug.Configure(population);
             hud = gameObject.AddComponent<PrototypeHud>();
             hud.Configure();
-            hud.PagePicked = page => menuPage = page;
+            hud.PagePicked = page =>
+            {
+                if (page == MenuPage.Settings) { settingsPanel?.Show(); return; }
+                menuPage = page;
+            };
             storeAudio = StoreAudio.Create(transform);
             storeAudio.Bind(pawns[0].Motor, signals);
             storeAudio.BindGuard(guardController);
@@ -270,18 +292,22 @@ namespace NightSupermarket.Game
             board = gameObject.AddComponent<LeaderboardStore>();
             board.Refresh(shift);
             SetActive(0);
+            if (!testRun) GameSettings.Apply(true); // test runs keep the defaults, whatever this machine has saved
+            if (hud != null && hud.Canvas != null) settingsPanel = SettingsPanel.Create(hud.Canvas);
             if (!testRun && network.IsAuthority && hud != null && hud.Canvas != null)
             {
-                // Clock in first: the night waits, frozen, until the player picks a shift.
+                // The main menu first: the night waits, frozen, until the player picks a night and a shift.
                 shiftCard = ShiftCard.Create(hud.Canvas);
                 shiftCard.Confirmed = ClockIn;
+                shiftCard.SettingsWanted = () => settingsPanel?.Show();
                 choosingShift = true;
                 foreach (var pawn in pawns) pawn.Input.Active = false; // keys on the card never reach the mannequin
                 Time.timeScale = 0f;
                 authority.Clock.Paused = true;
                 Cursor.lockState = CursorLockMode.None;
+                var remembered = (NightKind)Mathf.Clamp(PlayerPrefs.GetInt("ns-night", 0), 0, 4);
                 shiftCard.Show("Shift #" + shift + "  ·  Guard: " + guardProfile.Name + " (" + guardProfile.Trait + ")  ·  Crowd: " + CrowdPlan.LevelName(crowd.Level)
-                    + "  ·  Dare: " + NightDare.Title(dare), difficulty, PlayerPrefs.GetInt("ns-nights", 0));
+                    + "  ·  Dare: " + NightDare.Title(dare), difficulty, remembered, NightKinds.Featured(DailyShift()), PlayerPrefs.GetInt("ns-nights", 0));
                 return;
             }
             StartNight();
@@ -293,18 +319,35 @@ namespace NightSupermarket.Game
             if (!choosingShift) return;
             choosingShift = false;
             difficulty = shiftCard.Choice;
+            featuredNight = shiftCard.FeaturedPicked;
             shiftCard.Hide();
+            settingsPanel?.Hide();
             PlayerPrefs.SetInt("ns-difficulty", (int)difficulty);
+            PlayerPrefs.SetInt("ns-night", (int)shiftCard.Night);
             PlayerPrefs.Save();
-            score.DifficultyFactor = DifficultyRules.ScoreFactor(difficulty);
-            crowd.SetDifficulty(difficulty);
-            metrics.Difficulty = difficulty;
+            BeginScenario(shiftCard.Night, difficulty, featuredNight);
             help = false; timeScaleBeforeMenu = 1f; clockPausedBeforeMenu = false;
             Time.timeScale = 1f;
             authority.Clock.Paused = false;
             SetActive(active); // hands input back to whoever is being played
             for (int i = 0; i < pawns.Count; i++) pawns[i].Input.Consume();
             StartNight();
+        }
+
+        /// <summary>
+        /// Applies tonight's night and shift: the crowd, the sales, the score and the special night's set pieces.
+        /// The main menu calls it on clock-in; tests call it directly (scripted test nights are otherwise ordinary).
+        /// </summary>
+        public void BeginScenario(NightKind kind, Difficulty shiftDifficulty = Difficulty.Normal, bool featured = false)
+        {
+            nightKind = kind; difficulty = shiftDifficulty;
+            crowd.SetDifficulty(shiftDifficulty);
+            crowd.SetSalesCount(NightKinds.Sales(kind, DifficultyRules.Sales(shiftDifficulty)));
+            if (kind != NightKind.Regular) crowd.SalesEnabled = true;
+            score.DifficultyFactor = DifficultyRules.ScoreFactor(shiftDifficulty) * NightKinds.ScoreFactor(kind) * (featured ? NightKinds.FeaturedBonus : 1);
+            metrics.Difficulty = shiftDifficulty; metrics.Night = kind;
+            scenario.Begin(kind);
+            phaseApplied = false; // lights, torch and gems follow the special night from now on
         }
 
         private void StartNight()
@@ -354,6 +397,10 @@ namespace NightSupermarket.Game
             try
             {
                 string file = System.IO.Path.Combine(Application.persistentDataPath, "crowd-metrics.csv");
+                // A file started by an older version has other columns: keep it aside and start a fresh one.
+                if (System.IO.File.Exists(file))
+                    using (var reader = new System.IO.StreamReader(file))
+                        if (reader.ReadLine() != CrowdMetrics.Header) { reader.Close(); System.IO.File.Move(file, System.IO.Path.Combine(Application.persistentDataPath, "crowd-metrics-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".csv")); }
                 bool fresh = !System.IO.File.Exists(file);
                 System.IO.File.AppendAllText(file, (fresh ? CrowdMetrics.Header + "\n" : "") + metrics.Row(DateTime.Now.ToString("yyyy-MM-dd HH:mm"), shift, victory) + "\n");
             }
@@ -478,6 +525,7 @@ namespace NightSupermarket.Game
 
         private void OnCaptured(Pawn pawn, int index)
         {
+            scenario?.OnCaptured(pawn.Motor);
             if (pawn.Borrowed.HasValue) { pawn.Borrowed = null; Dress(pawn); }
             int moves = pawn.Detection != null ? pawn.Detection.Detection.Suspicion.Value : rules.discoveryThreshold;
             int penalty = score.Add(ScoreEvent.Capture);
@@ -616,13 +664,14 @@ namespace NightSupermarket.Game
             if (phaseApplied && moment.Phase == phase) return;
             bool first = !phaseApplied;
             phase = moment.Phase; phaseApplied = true;
-            authority.Lighting.Set(moment.Lighting);
-            authority.Surveillance.ReportLighting(moment.Lighting);
+            var lights = NightKinds.Lighting(nightKind, moment.Lighting);
+            authority.Lighting.Set(lights);
+            authority.Surveillance.ReportLighting(lights);
             guardController.Pace = (float)moment.GuardPace;
             if (population != null) population.CrowdScale = (float)moment.Crowd;
-            if (guardController.Flashlight != null && !guardController.PlayerDriven) guardController.Flashlight.SetEnabled(moment.Flashlight);
+            if (guardController.Flashlight != null && !guardController.PlayerDriven) guardController.Flashlight.SetEnabled(moment.Flashlight || NightKinds.GuardTorchAllNight(nightKind));
             if (moment.Phase == NightPhase.Lockdown || moment.Phase == NightPhase.Dawn) CloseFront(!first);
-            bool gemsOut = moment.Phase == NightPhase.Dark || moment.Phase == NightPhase.Lockdown;
+            bool gemsOut = moment.Phase == NightPhase.Dark || moment.Phase == NightPhase.Lockdown || nightKind == NightKind.Blackout;
             if (jobs != null) foreach (var gem in jobs.Gems) gem.Lit = gemsOut;
             if (first || moment.Phase == NightPhase.Dawn) return;
             if (moment.Phase == NightPhase.Dark && jobs != null && jobs.Gems.Count > 0)
@@ -639,6 +688,30 @@ namespace NightSupermarket.Game
         private bool dareDone, coinTossed, ranTonight;
         private int dareStreak;
         private float carouselSeconds, hushUntil = -1f;
+        // The live stream: are you in the shot, how long you have held a pose in it, and which stream already gave you a shout-out.
+        private bool inShot;
+        private float streamHold, liveDistance = float.MaxValue;
+        private int shoutoutFrom = -1;
+
+        private void TickStream(Pawn pawn, float delta)
+        {
+            var stream = crowd != null ? crowd.Stream : null;
+            var motor = pawn.Motor;
+            inShot = stream != null && motor.Record.Free && stream.Sees(motor.transform.position + Vector3.up * 1.2f, motor.transform);
+            liveDistance = stream != null ? Vector3.Distance(stream.transform.position, motor.transform.position) : float.MaxValue;
+            bool still = motor.ActualSpeed <= rules.movementThreshold;
+            bool posed = pawn.Mannequin.Holding || motor.Mounted;
+            if (inShot && still && posed && shoutoutFrom != stream.StreamId) streamHold += delta;
+            else streamHold = Mathf.Max(0f, streamHold - delta * 2f);
+            if (stream == null || streamHold < LiveStream.ShoutoutSeconds) return;
+            streamHold = 0f;
+            shoutoutFrom = stream.StreamId;
+            int pts = score.Add(ScoreEvent.Shoutout);
+            stream.Spike(1500 + UnityEngine.Random.Range(0, 2500));
+            Toast("SHOUT-OUT! \"this mannequin is SERVING\" — " + stream.Viewers.ToString("N0") + " watching   +" + pts, 3.5f);
+            storeAudio?.Exhale();
+            if (photos != null) photos.Snap("stream", 0.1f);
+        }
         private Wish wish;
         private FountainEffects fountainFx;
 
@@ -845,10 +918,13 @@ namespace NightSupermarket.Game
                 var command = pawn.Input.Consume();
                 if (authority.Flow.Phase != MatchPhase.Night) command = default;
                 bool posing = pawn.Mannequin.Tick(pawn.Input.PoseHeld && i == active, delta);
-                if (posing) command = default; // a held pose is a full-body freeze
+                if (posing) command = new PlayerCommand(Vector2.zero, false, false, command.Crouch); // a held pose is a full-body freeze (a crouch stays a crouch)
                 var before = pawn.Detection == null ? DetectionState.Green : pawn.Detection.Detection.State;
                 int suspicion = pawn.Detection == null ? 0 : pawn.Detection.Detection.Suspicion.Value;
                 pawn.Motor.Simulate(command, delta);
+                bool chair = pawn.Motor.SeatOwner != null && pawn.Motor.SeatOwner.Style == SeatStyle.Chair;
+                pawn.View.Crouching = pawn.Motor.Crouched || chair; // seated eyes are about where crouched ones are
+                if (pawn.Visual != null) { pawn.Visual.SetCrouch(pawn.Motor.Crouched); pawn.Visual.SetRide(pawn.Motor.Seat, chair ? SeatStyle.Chair : SeatStyle.Astride); }
                 if (pawn.Motor.Record.State == PlayerState.Running) ranTonight = true;
                 if (pawn.Motor.Surface is CarouselRide turning && turning.Speed > 1f && pawn.Motor.Record.Free)
                 {
@@ -856,10 +932,12 @@ namespace NightSupermarket.Game
                     if (dare == Dare.CarouselRide && carouselSeconds >= NightDare.CarouselSeconds) CompleteDare();
                 }
                 if (pawn.Motor.ActualSpeed > rules.movementThreshold && pawn.Motor.Record.Free) pawn.LastMoved = Time.time;
+                if (i == active) TickStream(pawn, delta);
                 if (pawn.Detection != null)
                 {
                     var detection = pawn.Detection.Detection;
-                    pawn.Detection.PoseCamouflage = pawn.Mannequin.Matches || Wardrobe.Fits(Effective(pawn), pawn.Mannequin.Zone);
+                    // A mannequin sitting on a carousel horse is the most natural thing in the toy store.
+                    pawn.Detection.PoseCamouflage = pawn.Mannequin.Matches || pawn.Motor.Mounted || Wardrobe.Fits(Effective(pawn), pawn.Mannequin.Zone);
                     pawn.Detection.CrowdCover = pawn.Cover != null && pawn.Cover.Strength >= CoverRules.GuardDoubtFrom;
                     if (pawn.Mannequin.TwitchedThisTick) { pawn.Detection.Twitch = true; if (i == active) Toast("Your arm twitched — held the pose too long", 2.5f); }
                     if (Covered(pawn.Motor)) { detection.Reset(); pawn.Detection.Twitch = false; }
@@ -949,6 +1027,7 @@ namespace NightSupermarket.Game
         {
             if (next != MatchPhase.Victory && next != MatchPhase.Defeat) return;
             if (next == MatchPhase.Victory) score.AddEscapeTime(authority.Clock.Remaining);
+            if (next == MatchPhase.Victory && scenario != null && scenario.PaysOnEscape) { int pts = score.Add(ScoreEvent.Diamond); Toast("You got away with the diamond!   +" + pts, 5f); }
             if (next == MatchPhase.Victory && !dareDone)
             {
                 bool viaFire = jobs != null && jobs.FireExit != null && EscapeInteractable.Last != null && EscapeInteractable.Last.transform == jobs.FireExit;
@@ -1045,10 +1124,19 @@ namespace NightSupermarket.Game
 
         private void Update()
         {
+            jobs?.TickGallery(Time.deltaTime);
             var keyboard = Keyboard.current;
             if (keyboard == null || authority == null) return;
+            if (settingsPanel != null && settingsPanel.Visible)
+            {
+                if (keyboard.escapeKey.wasPressedThisFrame || keyboard.enterKey.wasPressedThisFrame) settingsPanel.Hide();
+                return;
+            }
             if (choosingShift)
             {
+                if (keyboard.nKey.wasPressedThisFrame || keyboard.downArrowKey.wasPressedThisFrame) shiftCard.StepNight(1);
+                if (keyboard.upArrowKey.wasPressedThisFrame) shiftCard.StepNight(-1);
+                if (keyboard.sKey.wasPressedThisFrame) settingsPanel?.Show();
                 if (keyboard.digit1Key.wasPressedThisFrame || keyboard.numpad1Key.wasPressedThisFrame) shiftCard.Pick(0);
                 if (keyboard.digit2Key.wasPressedThisFrame || keyboard.numpad2Key.wasPressedThisFrame) shiftCard.Pick(1);
                 if (keyboard.digit3Key.wasPressedThisFrame || keyboard.numpad3Key.wasPressedThisFrame) shiftCard.Pick(2);
@@ -1092,6 +1180,7 @@ namespace NightSupermarket.Game
                 if (keyboard.digit4Key.wasPressedThisFrame) menuPage = MenuPage.Reports;
                 if (keyboard.digit5Key.wasPressedThisFrame || keyboard.vKey.wasPressedThisFrame) menuPage = MenuPage.Cameras;
                 if (keyboard.digit6Key.wasPressedThisFrame || keyboard.hKey.wasPressedThisFrame) menuPage = MenuPage.Controls;
+                if (keyboard.digit7Key.wasPressedThisFrame) settingsPanel?.Show();
             }
             else
             {
@@ -1300,8 +1389,11 @@ namespace NightSupermarket.Game
             if (!string.IsNullOrEmpty(pawn.Probe.Prompt)) return pawn.Probe.Prompt;
             if (jobs.Window != null && !jobs.Window.Complete && jobs.Window.Worker == pawn.Motor) return jobs.Window.PromptFor(pawn.Motor);
             if (jobs.RideSpot != null && !jobs.RideSpot.Complete && (jobs.RideSpot.Worker == pawn.Motor || pawn.Motor.Surface == jobs.Carousel)) return jobs.RideSpot.PromptFor(pawn.Motor);
+            if (jobs.Shoot != null && !jobs.Shoot.Complete && jobs.Shoot.Worker == pawn.Motor) return jobs.Shoot.PromptFor(pawn.Motor) + " · E or a move key stands up";
             if (pawn.Motor.Surface is EscalatorBelt) return "The escalator carries you — and a mannequin riding up is a mannequin that moves. The stairs let you stop.";
-            if (pawn.Motor.Surface is CarouselRide spinning) return spinning.Speed > 0.5f ? "The carousel turns: riders are not moving. Hold a pose and enjoy the view." : "The carousel has stopped. You are a mannequin standing on a ride — hold still.";
+            if (pawn.Motor.Mounted && pawn.Motor.SeatOwner != null && pawn.Motor.SeatOwner.Style == SeatStyle.Chair) return "Sitting on " + pawn.Motor.SeatOwner.What + ": a seated mannequin on display. Keep still. E or a move key stands up.";
+            if (pawn.Motor.Mounted) return pawn.Motor.Surface is CarouselRide horse && horse.Speed > 0.5f ? "Riding a horse: you are part of the ride. E or a move key climbs down." : "The ride has stopped. A mannequin on a horse — keep still. E or a move key climbs down.";
+            if (pawn.Motor.Surface is CarouselRide spinning) return spinning.Speed > 0.5f ? "The carousel turns: riders are not moving. E on a horse to climb on." : "The carousel has stopped. You are a mannequin standing on a ride — hold still.";
             var at = pawn.Motor.transform.position;
             if (at.y < 2.5f && at.x > -8 && at.x < 0 && at.z > 5 && at.z < 15)
             {
@@ -1452,6 +1544,9 @@ namespace NightSupermarket.Game
                 hudModel.CrowdText = crowd.NightLine;
                 hudModel.EventText = crowd.EventLine;
                 hudModel.EventHot = crowd.Stage == SaleStage.Open;
+                if (string.IsNullOrEmpty(hudModel.EventText) && scenario != null) { hudModel.EventText = scenario.EventLine(out bool hot); hudModel.EventHot = hot; }
+                hudModel.ObjectiveText = scenario != null ? scenario.Objective(Player) : "";
+                if (scenario != null && scenario.TryPrizeMark(out var prizeAt, out var prizeLabel)) hudModel.Marks.Add(new MapMark(prizeAt, "#FFD24D", prizeLabel));
                 if (crowd.TryMark(out var saleAt, out var saleLabel)) hudModel.Marks.Add(new MapMark(saleAt, "#FF8A3D", saleLabel));
                 int next = -1;
                 if (missions != null) for (int i = 0; i < missions.Missions.Count && next < 0; i++) if (!missions.Missions[i].Complete && !missions.Missions[i].Failed) next = i;
@@ -1466,8 +1561,20 @@ namespace NightSupermarket.Game
                 foreach (var h in crowd.Heat)
                     hudModel.Heat.Add((HudText.MapZone(h.Zone), h.Level, h.Trend, h.People));
                 var cover = active < pawns.Count ? pawns[active].Cover : null;
-                hudModel.CoverOn = cover != null && cover.Covered;
-                hudModel.CoverText = cover == null ? "" : cover.Covered ? "IN THE CROWD · " + cover.Companions + " shoppers hide you" : cover.Hint;
+                var me = active < pawns.Count ? pawns[active].Motor : null;
+                var nook = hiding != null && me != null && me.Record.Free ? hiding.At(me.transform.position) : null;
+                bool hidden = hiding != null && hiding.IsHidden(me);
+                var live = crowd.Stream;
+                bool shouted = live != null && shoutoutFrom == live.StreamId;
+                hudModel.CoverLive = !hidden && (inShot || (live != null && liveDistance < 14f && (cover == null || !cover.Covered) && nook == null));
+                hudModel.CoverOn = hidden || (cover != null && cover.Covered);
+                hudModel.CoverText = hidden ? "HIDDEN · nobody can see you — unless the guard walks right up"
+                    : inShot ? (shouted ? "● IN THE LIVE SHOT · don't move — it goes straight to the guard"
+                        : streamHold > 0.1f ? "● ON THE STREAM · hold it… shout-out in " + Mathf.CeilToInt(LiveStream.ShoutoutSeconds - streamHold) + "s"
+                        : "● IN THE LIVE SHOT · freeze, or hold a pose for a shout-out")
+                    : hudModel.CoverLive ? "● LIVE " + Mathf.RoundToInt(liveDistance) + " m away · their red shot sees through any crowd"
+                    : nook != null ? (me.Crouched ? "Keep still…" : "Hiding spot — hold Ctrl to crouch here and vanish")
+                    : cover == null ? "" : cover.Covered ? "IN THE CROWD · " + cover.Companions + " shoppers hide you" : cover.Hint;
             }
             hudModel.GemText = jobs == null || jobs.Gems.Count == 0 ? "" : "Hidden gems tonight: " + jobs.Gems.Count + " · found " + gemsTonight
                 + (phase == NightPhase.Dark || phase == NightPhase.Lockdown ? " · they glint now (cyan on the map)" : " · they only glint after lights out");
@@ -1664,6 +1771,7 @@ namespace NightSupermarket.Game
         {
             controls = new KeyCommandMap("CONTROLS")
                 .Describe("WASD", "move").Describe("Mouse", "look").Describe("Shift", "run").Describe("Space", "jump")
+                .Describe("Ctrl / Option", "hold to crouch: low cover hides you; crouch still at a hiding spot to vanish")
                 .Describe("Right mouse", "hold to freeze in a pose").Describe("Scroll", "choose the pose")
                 .Describe("O / B", "Night page: next outfit / buy or wear it")
                 .Describe("E", "use / pick up").Describe("G / Q", "drop / throw")

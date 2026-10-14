@@ -17,6 +17,8 @@ namespace NightSupermarket.Game
         private Func<SuspiciousActivityEvent, bool> reportSink;
         private Func<double> clock;
         public int ReportsSent { get; private set; }
+        /// <summary>The NPC's id (changes each time a pooled body is reused).</summary>
+        public int NpcId => Controller != null ? Controller.Id : 0;
         public abstract byte StateCode { get; }
         public abstract string StateLabel(byte code);
         public virtual Vector3? Destination => Navigation != null && Navigation.Target != null ? Navigation.Target.Position : (Vector3?)null;

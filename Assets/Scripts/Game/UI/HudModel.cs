@@ -3,7 +3,7 @@ using NightSupermarket.Core;
 using UnityEngine;
 namespace NightSupermarket.Game
 {
-    public enum MenuPage { Night, Missions, Inventory, Reports, Cameras, Controls }
+    public enum MenuPage { Night, Missions, Inventory, Reports, Cameras, Controls, Settings }
 
     public readonly struct HudLine
     {
@@ -61,7 +61,11 @@ namespace NightSupermarket.Game
         public string JobCrowdText, JobCrowdTint;
         /// <summary>"IN THE CROWD" badge while shoppers hide you; otherwise a hint about why they don't.</summary>
         public string CoverText;
+        /// <summary>A special night's objective (the diamond, the present), under the job crowd chip.</summary>
+        public string ObjectiveText;
         public bool CoverOn;
+        /// <summary>The cover chip is about the live stream (red).</summary>
+        public bool CoverLive;
         /// <summary>Map heat per department (map zone name, heat level 0–3, trend -1/0/+1, people).</summary>
         public readonly List<(string zone, int level, int trend, int people)> Heat = new List<(string, int, int, int)>();
 

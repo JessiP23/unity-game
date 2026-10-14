@@ -74,6 +74,12 @@ namespace NightSupermarket.Game
             Prompt = "";
             Target = null;
             if (!view.Active || (!motor.Record.Free && !motor.Record.InBackroom)) return;
+            // Seated (a horse, a sofa): E gets you up wherever you are looking, and nothing else is in reach.
+            if (motor.Mounted)
+            {
+                if (Cursor.lockState == CursorLockMode.Locked && Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) motor.Dismount();
+                return;
+            }
             Aim(out var origin, out var forward);
             var target = FindTarget(origin, forward);
             if (target == null) return;

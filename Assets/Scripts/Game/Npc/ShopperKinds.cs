@@ -28,6 +28,20 @@ namespace NightSupermarket.Game
             return kid;
         }
 
+        private static CustomerProfile partyKid;
+
+        /// <summary>A kid at the birthday party: stays in the toy store for the whole night and sees everything.</summary>
+        public static CustomerProfile PartyKid()
+        {
+            if (partyKid != null) return partyKid;
+            partyKid = Object.Instantiate(Kid());
+            partyKid.name = "Party kid";
+            partyKid.browseSeconds = new Vector2(6, 14); partyKid.waitChance = 0.5f; partyKid.waitSeconds = new Vector2(2, 5);
+            partyKid.items = new Vector2Int(8, 12); partyKid.checkoutChance = 0f; partyKid.maxVisitSeconds = 900f;
+            partyKid.preferredDepartments = new[] { new CustomerProfile.Preference { department = ZoneType.ToyStore, weight = 100f } };
+            return partyKid;
+        }
+
         public static CustomerProfile PhoneZombie()
         {
             if (phone != null) return phone;
@@ -49,7 +63,8 @@ namespace NightSupermarket.Game
             influencer.walkSpeed = new Vector2(0.8f, 1.0f);
             influencer.browseSeconds = new Vector2(9, 14); influencer.waitChance = 0.6f; influencer.waitSeconds = new Vector2(4, 7);
             influencer.items = new Vector2Int(2, 3);
-            influencer.visionRange = 11f; influencer.fieldOfView = 150f; influencer.perceptionInterval = 0.15f;
+            // The camera is the eyes: what the red fan on the floor shows is exactly what they see.
+            influencer.visionRange = LiveStream.Range; influencer.fieldOfView = LiveStream.Angle; influencer.perceptionInterval = 0.15f;
             // On camera there is no "maybe": the clip is posted before anyone thinks twice.
             influencer.suspicionSensitivity = new Vector2(2.2f, 2.4f); influencer.noticeSeconds = new Vector2(0.15f, 0.2f);
             influencer.reactionSeconds = new Vector2(0.25f, 0.35f); influencer.reportDelaySeconds = new Vector2(0.25f, 0.35f);
@@ -77,6 +92,8 @@ namespace NightSupermarket.Game
         public void Apply(ShopperKind kind, NpcAnimationHooks hooks)
         {
             Kind = kind;
+            var stream = GetComponent<LiveStream>();
+            if (stream != null && kind != ShopperKind.Influencer) stream.enabled = false; // a pooled body that streamed last time
             if (props != null) Destroy(props);
             props = null; CameraLight = null;
             if (body == null) body = GetComponent<CapsuleCollider>();
@@ -113,6 +130,28 @@ namespace NightSupermarket.Game
             }
             foreach (var r in props.GetComponentsInChildren<Renderer>()) { r.shadowCastingMode = ShadowCastingMode.Off; r.gameObject.layer = 2; }
             foreach (var c in props.GetComponentsInChildren<Collider>()) Destroy(c);
+        }
+
+        /// <summary>A phone held up as a torch: a narrow white beam that is exactly what this shopper can see (blackout).</summary>
+        public void AddTorch()
+        {
+            var hooks = GetComponent<NpcAnimationHooks>();
+            var visual = hooks != null ? hooks.Visual : null;
+            if (props == null) { props = new GameObject("Torch props"); props.transform.SetParent(transform, false); }
+            var hand = Follow(visual, new Vector3(0.2f, 1.25f, 0.35f), new Vector3(0f, 0.04f, 0.06f), new Vector3(8f, 0f, 0f));
+            var phone = DressingKit.Panel(hand, "Phone", Vector3.zero, new Vector3(0.075f, 0.15f, 0.012f));
+            phone.sharedMaterial = ArtLibrary.Lit(new Color(0.08f, 0.08f, 0.1f), 0.8f);
+            var lamp = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            lamp.name = "Torch LED"; Destroy(lamp.GetComponent<Collider>());
+            lamp.transform.SetParent(hand, false); lamp.transform.localPosition = new Vector3(0f, 0.06f, 0.008f); lamp.transform.localScale = Vector3.one * 0.02f;
+            lamp.GetComponent<Renderer>().sharedMaterial = ArtLibrary.Emissive(Color.white, 4f);
+            var beam = new GameObject("Torch beam").AddComponent<Light>();
+            beam.transform.SetParent(hand, false);
+            beam.transform.localRotation = Quaternion.Euler(10f, 0f, 0f);
+            beam.type = LightType.Spot; beam.spotAngle = 38f; beam.range = 8.5f; beam.intensity = 2.4f;
+            beam.color = new Color(1f, 0.97f, 0.9f); beam.shadows = LightShadows.None;
+            if (visual != null && Kind == ShopperKind.Regular) visual.SetStance(Stance.Filming);
+            foreach (var r in props.GetComponentsInChildren<Renderer>()) { r.shadowCastingMode = ShadowCastingMode.Off; r.gameObject.layer = 2; }
         }
 
         /// <summary>A kid pointing at what they saw (and back to normal once they calm down).</summary>
@@ -164,7 +203,7 @@ namespace NightSupermarket.Game
             cone.transform.SetParent(hand, false);
             cone.transform.localPosition = new Vector3(0f, 0f, 0.02f);
             CameraLight = cone.AddComponent<Light>();
-            CameraLight.type = LightType.Spot; CameraLight.spotAngle = 70f; CameraLight.range = 10f;
+            CameraLight.type = LightType.Spot; CameraLight.spotAngle = LiveStream.Angle; CameraLight.range = LiveStream.Range;
             CameraLight.color = new Color(1f, 0.2f, 0.15f); CameraLight.intensity = 2.2f; CameraLight.shadows = LightShadows.None;
         }
 

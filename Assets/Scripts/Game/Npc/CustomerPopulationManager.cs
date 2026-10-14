@@ -149,8 +149,12 @@ namespace NightSupermarket.Game
                 else BeginEmployee(npc, rng);
             }
             active.Add(npc); byId[id] = npc;
+            if (Authority) Spawned?.Invoke(npc);
             return npc;
         }
+
+        /// <summary>Someone new walked in (after they are dressed and configured): special nights adjust them here.</summary>
+        public event Action<NpcController> Spawned;
 
         private void BeginCustomer(NpcController npc, Random rng, bool alreadyInside, CustomerProfile chosen, ShopperKind kind, CustomerBehavior leader)
         {

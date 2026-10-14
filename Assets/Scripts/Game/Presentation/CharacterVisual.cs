@@ -63,7 +63,24 @@ namespace NightSupermarket.Game
             // Carrying: a box held out in front at waist height.
             new StancePose(new Vector3(-0.15f, -0.4f, 0.9f), new Vector3(0.15f, -0.4f, 0.9f), new Vector3(0.2f, 0.05f, 1f), new Vector3(-0.2f, 0.05f, 1f), 4f, -3f)
         };
-        private Transform handL, handR;
+        private Transform handL, handR, thighL, thighR, calfL, calfR, footL, footR;
+        private float crouchWeight;
+        private bool crouching;
+        /// <summary>Squat down (the player's crouch): hips drop, knees bend forward, back leans in.</summary>
+        public void SetCrouch(bool down) => crouching = down;
+        private Transform rideSeat;
+        private Vector3 lastSeat;
+        private Quaternion seatYaw = Quaternion.identity, restLocal = Quaternion.identity, frame = Quaternion.identity;
+        private float rideWeight;
+        private bool rideRotated;
+        private SeatStyle rideStyle;
+        /// <summary>Sit (null to stand): astride a carousel saddle, legs either side and hands on the pole; or on a chair, knees forward.</summary>
+        public void SetRide(Transform seat, SeatStyle style = SeatStyle.Astride)
+        {
+            // Getting up teleports the body: snap out of the seated pose rather than stretching back to the old seat.
+            if (seat == null && rideSeat != null) { rideWeight = 0f; if (rideRotated && host != null) { transform.localRotation = restLocal; rideRotated = false; } }
+            rideSeat = seat; if (seat != null) rideStyle = style;
+        }
         /// <summary>Bones props hang from (null on rigs without Biped names).</summary>
         public Transform HandRight => handR;
         public Transform HandLeft => handL;
@@ -97,6 +114,7 @@ namespace NightSupermarket.Game
         private void Configure(Transform owner, CharacterProfile character)
         {
             host = owner; profile = character;
+            restLocal = transform.localRotation; frame = host.rotation;
             follow = host.GetComponent<MotionInterpolator>();
             if (follow == null) follow = host.gameObject.AddComponent<MotionInterpolator>();
             renderers = GetComponentsInChildren<Renderer>();
@@ -111,6 +129,12 @@ namespace NightSupermarket.Game
                 else if (t.name.EndsWith("Spine1")) spine = t;
                 else if (t.name.EndsWith("L Hand")) handL = t;
                 else if (t.name.EndsWith("R Hand")) handR = t;
+                else if (t.name.EndsWith("L Thigh")) thighL = t;
+                else if (t.name.EndsWith("R Thigh")) thighR = t;
+                else if (t.name.EndsWith("L Calf")) calfL = t;
+                else if (t.name.EndsWith("R Calf")) calfR = t;
+                else if (t.name.EndsWith("L Foot")) footL = t;
+                else if (t.name.EndsWith("R Foot")) footR = t;
             }
             if (hips != null) hipsBind = transform.InverseTransformPoint(hips.position);
             if (upperArmL == null || upperArmR == null || forearmL == null || forearmR == null || head == null)
@@ -188,7 +212,7 @@ namespace NightSupermarket.Game
             if (bone == null || child == null || direction == Vector3.zero) return;
             Vector3 current = child.position - bone.position;
             if (current.sqrMagnitude < 1e-6f) return;
-            Vector3 wanted = host.rotation * direction.normalized;
+            Vector3 wanted = frame * direction.normalized;
             var turn = Quaternion.FromToRotation(current.normalized, wanted);
             bone.rotation = Quaternion.Slerp(Quaternion.identity, turn, stanceWeight) * bone.rotation;
         }
@@ -197,7 +221,92 @@ namespace NightSupermarket.Game
         private void Tilt(Transform bone, float degrees)
         {
             if (bone == null || Mathf.Approximately(degrees, 0f)) return;
-            bone.rotation = Quaternion.AngleAxis(degrees * stanceWeight, host.right) * bone.rotation;
+            bone.rotation = Quaternion.AngleAxis(degrees * stanceWeight, frame * Vector3.right) * bone.rotation;
+        }
+
+        private void ApplyCrouch(float delta)
+        {
+            crouchWeight = Mathf.MoveTowards(crouchWeight, crouching ? 1f : 0f, delta / 0.2f);
+            if (crouchWeight <= 0f || hips == null || host == null) return;
+            float w = Mathf.SmoothStep(0f, 1f, crouchWeight);
+            hips.position -= host.up * 0.36f * w;
+            Bend(thighL, calfL, new Vector3(-0.05f, -0.45f, 0.9f), w);
+            Bend(thighR, calfR, new Vector3(0.05f, -0.45f, 0.9f), w);
+            Bend(calfL, footL, new Vector3(0f, -1f, -0.15f), w);
+            Bend(calfR, footR, new Vector3(0f, -1f, -0.15f), w);
+            // Keep the soles on the floor whatever the rig's proportions: lift the hips by however far the feet sank.
+            if (footL != null && footR != null)
+            {
+                float sink = host.position.y + 0.08f - Mathf.Min(footL.position.y, footR.position.y);
+                if (sink > 0f) hips.position += host.up * sink;
+            }
+            if (spine != null) spine.rotation = Quaternion.AngleAxis(18f * w, host.right) * spine.rotation;
+            if (head != null) head.rotation = Quaternion.AngleAxis(-12f * w, host.right) * head.rotation;
+        }
+
+        /// <summary>Like <see cref="Aim"/>, with its own weight (crouching is independent of the upper-body pose).</summary>
+        private void Bend(Transform bone, Transform child, Vector3 direction, float weight)
+        {
+            if (bone == null || child == null) return;
+            Vector3 current = child.position - bone.position;
+            if (current.sqrMagnitude < 1e-6f) return;
+            var turn = Quaternion.FromToRotation(current.normalized, frame * direction.normalized);
+            bone.rotation = Quaternion.Slerp(Quaternion.identity, turn, weight) * bone.rotation;
+        }
+
+        /// <summary>
+        /// Riding faces the body along the horse whatever way the camera (and so the host) turns, so it never sits
+        /// sideways through the saddle. Runs first: the poses below are aimed in this frame.
+        /// </summary>
+        private void UpdateRideFrame(float delta)
+        {
+            rideWeight = Mathf.MoveTowards(rideWeight, rideSeat != null ? 1f : 0f, delta / 0.25f);
+            if (rideSeat != null)
+            {
+                lastSeat = rideSeat.position;
+                Vector3 f = rideSeat.forward; f.y = 0f;
+                if (f.sqrMagnitude > 0.001f) seatYaw = Quaternion.LookRotation(f, Vector3.up);
+            }
+            float w = Mathf.SmoothStep(0f, 1f, rideWeight);
+            frame = w > 0f ? Quaternion.Slerp(host.rotation, seatYaw, w) : host.rotation;
+            if (w > 0f)
+            {
+                transform.localRotation = Quaternion.Inverse(host.rotation) * frame * restLocal;
+                rideRotated = true;
+            }
+            else if (rideRotated) { transform.localRotation = restLocal; rideRotated = false; }
+        }
+
+        private void ApplyRide()
+        {
+            if (rideWeight <= 0f || hips == null || host == null) return;
+            float w = Mathf.SmoothStep(0f, 1f, rideWeight);
+            hips.position = Vector3.Lerp(hips.position, lastSeat + Vector3.up * (rideStyle == SeatStyle.Chair ? 0.1f : 0.06f), w);
+            if (rideStyle == SeatStyle.Chair)
+            {
+                // Seated: thighs level and forward, shins down to the floor, hands resting on the knees.
+                Bend(thighL, calfL, new Vector3(-0.1f, -0.08f, 1f), w);
+                Bend(thighR, calfR, new Vector3(0.1f, -0.08f, 1f), w);
+                Bend(calfL, footL, new Vector3(-0.03f, -1f, 0.12f), w);
+                Bend(calfR, footR, new Vector3(0.03f, -1f, 0.12f), w);
+                if (stance != Stance.Neutral) return;
+                Bend(upperArmL, forearmL, new Vector3(-0.12f, -0.9f, 0.35f), w);
+                Bend(upperArmR, forearmR, new Vector3(0.12f, -0.9f, 0.35f), w);
+                Bend(forearmL, handL, new Vector3(0.05f, -0.2f, 1f), w);
+                Bend(forearmR, handR, new Vector3(-0.05f, -0.2f, 1f), w);
+                return;
+            }
+            // Astride: thighs forward and out round the horse's barrel, shins hanging down by its sides.
+            Bend(thighL, calfL, new Vector3(-0.42f, -0.5f, 0.75f), w);
+            Bend(thighR, calfR, new Vector3(0.42f, -0.5f, 0.75f), w);
+            Bend(calfL, footL, new Vector3(-0.1f, -1f, -0.08f), w);
+            Bend(calfR, footR, new Vector3(0.1f, -1f, -0.08f), w);
+            if (stance != Stance.Neutral) return; // a held pose keeps its arms
+            // Both hands on the brass pole in front.
+            Bend(upperArmL, forearmL, new Vector3(-0.12f, -0.35f, 0.92f), w);
+            Bend(upperArmR, forearmR, new Vector3(0.12f, -0.35f, 0.92f), w);
+            Bend(forearmL, handL, new Vector3(0.25f, 0.45f, 0.85f), w);
+            Bend(forearmR, handR, new Vector3(-0.25f, 0.45f, 0.85f), w);
         }
 
         private int detail = -1;
@@ -302,7 +411,7 @@ namespace NightSupermarket.Game
         {
             if (garment == null || !garment.enabled) return;
             Vector3 anchor = spine != null ? spine.position : transform.position + Vector3.up * 1.25f;
-            garment.transform.SetPositionAndRotation(anchor + host.forward * 0.08f + Vector3.up * 0.06f, host.rotation);
+            garment.transform.SetPositionAndRotation(anchor + frame * Vector3.forward * 0.08f + Vector3.up * 0.06f, frame);
         }
 
         private void Update()
@@ -350,6 +459,7 @@ namespace NightSupermarket.Game
         {
             if (host == null) return;
             transform.position = follow.Position + host.rotation * profile.Offset;
+            UpdateRideFrame(Time.deltaTime);
             ApplyStance(Time.deltaTime);
             if (hips != null)
             {
@@ -357,6 +467,8 @@ namespace NightSupermarket.Game
                 local.x = hipsBind.x; local.z = hipsBind.z;
                 hips.position = transform.TransformPoint(local);
             }
+            ApplyRide();
+            ApplyCrouch(Time.deltaTime);
             PlaceGarment();
             ApplyTopple(Time.deltaTime);
         }
@@ -367,6 +479,7 @@ namespace NightSupermarket.Game
         /// <summary>Falls over stiff as a plank (true) or stands back up (false). Pivots at the feet, with one small bounce.</summary>
         public void Topple(bool down)
         {
+            if (down) { rideSeat = null; rideWeight = 0f; if (rideRotated) { transform.localRotation = restLocal; rideRotated = false; } frame = host != null ? host.rotation : frame; }
             if (down && toppleTarget <= 0f && topple <= 0f) toppleRest = transform.localRotation;
             toppleTarget = down ? 1f : 0f;
             if (!down) { topple = 0f; toppleVelocity = 0f; transform.localRotation = toppleRest; }

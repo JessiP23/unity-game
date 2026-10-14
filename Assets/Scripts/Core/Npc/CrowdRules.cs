@@ -123,6 +123,7 @@ namespace NightSupermarket.Core
         public double CoveredSeconds, NightSeconds, BudgetSum, FrameMsSum;
         public int Samples;
         public Difficulty Difficulty;
+        public NightKind Night;
         public double[] WaitSeconds = new double[0];
 
         public void Sample(int crowd, int budget, double frameMs)
@@ -133,7 +134,7 @@ namespace NightSupermarket.Core
 
         public double ReportsPerMinute => NightSeconds > 0 ? Reports / (NightSeconds / 60) : 0;
 
-        public static string Header => "date,shift,difficulty,level,victory,jobs_done,jobs_total,reports,reports_per_min,influencer_reports,peak_crowd,mean_budget,mean_frame_ms,covered_s,night_s,wait_s_per_job";
+        public static string Header => "date,shift,difficulty,level,victory,jobs_done,jobs_total,reports,reports_per_min,influencer_reports,peak_crowd,mean_budget,mean_frame_ms,covered_s,night_s,wait_s_per_job,night";
 
         public string Row(string date, int shift, bool victory)
         {
@@ -142,7 +143,7 @@ namespace NightSupermarket.Core
             return string.Join(",", date, shift.ToString(c), DifficultyRules.Name(Difficulty), Level.ToString(c), victory ? "1" : "0",
                 JobsDone.ToString(c), JobsTotal.ToString(c), Reports.ToString(c), ReportsPerMinute.ToString("0.00", c), InfluencerReports.ToString(c),
                 PeakCrowd.ToString(c), (Samples > 0 ? BudgetSum / Samples : 0).ToString("0.0", c), (Samples > 0 ? FrameMsSum / Samples : 0).ToString("0.0", c),
-                CoveredSeconds.ToString("0", c), NightSeconds.ToString("0", c), waits);
+                CoveredSeconds.ToString("0", c), NightSeconds.ToString("0", c), waits, NightKinds.Name(Night));
         }
     }
 }

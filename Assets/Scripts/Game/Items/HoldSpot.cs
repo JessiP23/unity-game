@@ -22,6 +22,15 @@ namespace NightSupermarket.Game
         /// <summary>While this returns false the hold keeps its worker but makes no progress (the ride has stopped).</summary>
         public Func<bool> Gate;
         public string GateHint = "Wait…";
+        /// <summary>Per worker: while false, no progress (and no loss); <see cref="HoldHint"/> says what to do.</summary>
+        public Func<PlayerMotor, bool> Holds;
+        public string HoldHint = "Hold still";
+        /// <summary>Progress per second for this worker (default 1: progress is seconds). The carousel counts degrees turned.</summary>
+        public Func<PlayerMotor, float> Rate;
+        /// <summary>How the prompt shows what is left (default "hold still N s").</summary>
+        public Func<float, string> Left;
+        /// <summary>For an auto-start spot: someone to start for even without touching the trigger (a rider on a horse).</summary>
+        public Func<PlayerMotor> Seek;
         public string StartHint = "E — start";
         public string BlockedHint = "Wait until nobody is looking";
         public string DoneHint = "Done";
@@ -42,14 +51,16 @@ namespace NightSupermarket.Game
             authority = match; signals = world; kind = actionKind; actionTagId = actionTag; destination = actionDestination;
         }
 
-        public string Prompt => Complete ? DoneHint : Worker != null ? Label + " · hold still " + Mathf.CeilToInt(Seconds - Progress) + " s" : StartHint;
+        public string Prompt => Complete ? DoneHint : Worker != null ? Label + " · " + LeftText() : StartHint;
+        private string LeftText() => Left != null ? Left(Seconds - Progress) : "hold still " + Mathf.CeilToInt(Seconds - Progress) + " s";
 
         public string PromptFor(PlayerMotor player)
         {
             if (Complete) return DoneHint;
             if (Worker == player && Time.time < movedUntil) return MovedHint;
             if (Worker == player && Gate != null && !Gate()) return GateHint;
-            if (Worker == player) return Label + " · hold still " + Mathf.CeilToInt(Seconds - Progress) + " s";
+            if (Worker == player && Holds != null && !Holds(player)) return HoldHint + " · " + LeftText();
+            if (Worker == player) return Label + " · " + LeftText();
             if (CanStart != null && !CanStart(player)) return BlockedHint;
             return StartHint;
         }
@@ -77,7 +88,15 @@ namespace NightSupermarket.Game
             if (motor != null) Begin(motor, false);
         }
 
-        private void Update() => Tick(Time.deltaTime);
+        private void Update()
+        {
+            if (AutoStart && Worker == null && !Complete && Seek != null)
+            {
+                var someone = Seek();
+                if (someone != null) Begin(someone, false);
+            }
+            Tick(Time.deltaTime);
+        }
 
         public void Tick(float delta)
         {
@@ -96,7 +115,8 @@ namespace NightSupermarket.Game
             }
             wasMoving = false;
             if (Gate != null && !Gate()) return;
-            Progress += delta;
+            if (Holds != null && !Holds(Worker)) return;
+            Progress += delta * (Rate != null ? Mathf.Max(0f, Rate(Worker)) : 1f);
             if (Progress < Seconds) return;
             Complete = true;
             var done = Worker; Worker = null;

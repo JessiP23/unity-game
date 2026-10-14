@@ -89,6 +89,9 @@ namespace NightSupermarket.Game
             Destroy(board.GetComponent<Collider>());
             var label = SignFactory.Label(root, text, 0.11f, new Color(0.12f, 0.1f, 0.1f));
             if (label != null) label.transform.localPosition = new Vector3(0f, 0f, -0.02f);
+            // Printed on both faces: readable from any side, even in the frame before it turns to the camera.
+            var rear = SignFactory.Label(root, text, 0.11f, new Color(0.12f, 0.1f, 0.1f));
+            if (rear != null) { rear.transform.localPosition = new Vector3(0f, 0f, 0.02f); rear.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); }
             Light flash_ = null;
             if (flash)
             {
@@ -99,12 +102,14 @@ namespace NightSupermarket.Game
                 flash_.type = LightType.Point; flash_.range = 5f; flash_.intensity = 0f; flash_.color = new Color(0.9f, 0.95f, 1f);
                 flash_.shadows = LightShadows.None;
             }
+            var view = ViewCameras.Current;
+            if (view != null) { Vector3 toCamera = view.transform.position - root.position; toCamera.y = 0; if (toCamera.sqrMagnitude > 0.001f) root.rotation = Quaternion.LookRotation(-toCamera); }
             bubbles.Add(new Bubble { Root = root, Until = Time.time + seconds, Flash = flash_ });
         }
 
         private void TickBubbles()
         {
-            var eyes = Camera.main;
+            var eyes = ViewCameras.Current;
             for (int i = bubbles.Count - 1; i >= 0; i--)
             {
                 var bubble = bubbles[i];

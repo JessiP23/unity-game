@@ -52,7 +52,11 @@ namespace NightSupermarket.Core
             new JobTemplate("fragile-vase", "Carry a vase to the Home rug without breaking it", ActionKind.Place, "vase", 1,
                 "Vases are in the aisles. Carrying rattles; a hard drop breaks it. G on the Home rug.", "Home", "carry", "home"),
             new JobTemplate("carousel-ride", "Ride the toy-store carousel for one full turn", ActionKind.Place, "carousel", 1,
-                "Through the atrium to the toy store. Step on while it turns and hold the Display pose (right mouse) for a whole turn. Riding hides you; the stop does not.", "Toy store", "hold", "carousel"),
+                "Through the atrium to the toy store. Climb on a horse (E) and ride a whole turn, about 20 s. A rider is part of the ride; climbing on and off in plain sight is not.", "Toy store", "hold", "carousel"),
+            new JobTemplate("tv-channel", "Switch three gallery TVs to the mannequin channel", ActionKind.Place, "tvchannel", 3,
+                "Upstairs: the escalator or the stairs by Clothing. E on a marked TV on the gallery wall and keep still 2 s, three times. Shoppers stop to watch the wall.", "Gallery", "tv"),
+            new JobTemplate("sofa-shoot", "Sit for the catalogue photo on the gallery sofa", ActionKind.Place, "sofa", 1,
+                "Upstairs in the gallery lounge. E on the sofa to sit down, then keep still 15 s while the photographer's flash goes off. A seated mannequin is on display; sitting down and getting up are moving.", "Gallery", "sit"),
             new JobTemplate("top-shelf-robot", "Take the robot from the toy store's top shelf", ActionKind.Collect, "robot", 1,
                 "Toy store, tall shelf by the step stool. Climb the stool, E on the robot. Run past a toy shelf and it rattles.", "Toy store", "grab")
         };

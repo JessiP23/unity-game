@@ -23,7 +23,7 @@ namespace NightSupermarket.Game
 
         private GameObject menuRoot, toastPanel, promptPanel, tipPanel, bannerRoot, endRoot, posePanel, reportsRow, nextPanel;
         private Text controlsTitle;
-        private Text jobCrowd, coverBadge;
+        private Text jobCrowd, coverBadge, objective;
         private Image coverChip;
         private readonly Dictionary<string, (Image heat, Text label)> heatZones = new Dictionary<string, (Image, Text)>();
         private Text clock, phaseLine, eventLine, guardText, peopleText, reportsText, nextText, prompt, tip, toast, hint;
@@ -39,8 +39,8 @@ namespace NightSupermarket.Game
         private readonly List<Row> controlRows = new List<Row>();
         private readonly List<Row> scoreRows = new List<Row>();
         private readonly List<Row> boardRows = new List<Row>();
-        private readonly Image[] tabs = new Image[6];
-        private readonly Text[] tabLabels = new Text[6];
+        private readonly Image[] tabs = new Image[TabNames.Length];
+        private readonly Text[] tabLabels = new Text[TabNames.Length];
         private RectTransform mapRoot, markRoot, upstairsRoot, upstairsMarkRoot;
         private const float InsetWidth = 256f, InsetHeight = 160f;
         private readonly List<Image> marks = new List<Image>();
@@ -49,8 +49,8 @@ namespace NightSupermarket.Game
             public GameObject Root;
             public Text Key, Title, Detail;
         }
-        private static readonly string[] TabNames = { "Night", "Missions", "Inventory", "Reports", "Cameras", "Controls" };
-        private static readonly MenuPage[] Pages = { MenuPage.Night, MenuPage.Missions, MenuPage.Inventory, MenuPage.Reports, MenuPage.Cameras, MenuPage.Controls };
+        private static readonly string[] TabNames = { "Night", "Missions", "Inventory", "Reports", "Cameras", "Controls", "Settings" };
+        private static readonly MenuPage[] Pages = { MenuPage.Night, MenuPage.Missions, MenuPage.Inventory, MenuPage.Reports, MenuPage.Cameras, MenuPage.Controls, MenuPage.Settings };
         // The map covers the whole mall: x -30..15 (toy store to the east wall), z -33..15 (mall doors to the back wall).
         private const float MapMinX = -30f, MapMaxX = 15f, MapMinZ = -33f, MapMaxZ = 15f;
         private const float MapSize = 520f, MapW = MapSize * (MapMaxX - MapMinX) / (MapMaxZ - MapMinZ), MapH = MapSize;
@@ -133,9 +133,14 @@ namespace NightSupermarket.Game
             jobCrowd.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(jobCrowd.text));
             // Bottom centre: hidden in the crowd, or why not.
             coverBadge.text = model.Ended ? "" : model.CoverText ?? "";
-            coverBadge.color = model.CoverOn ? new Color(0.36f, 0.88f, 1f, 0.75f + 0.25f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 2.5f))) : UiTheme.Mute;
-            coverChip.color = model.CoverOn ? new Color(0.03f, 0.16f, 0.2f, 0.88f) : new Color(0.08f, 0.08f, 0.09f, 0.7f);
+            float coverPulse = Mathf.Abs(Mathf.Sin(Time.unscaledTime * 2.5f));
+            coverBadge.color = model.CoverLive ? new Color(1f, 0.42f, 0.38f, 0.75f + 0.25f * coverPulse)
+                : model.CoverOn ? new Color(0.36f, 0.88f, 1f, 0.75f + 0.25f * coverPulse) : UiTheme.Mute;
+            coverChip.color = model.CoverLive ? new Color(0.24f, 0.03f, 0.04f, 0.9f)
+                : model.CoverOn ? new Color(0.03f, 0.16f, 0.2f, 0.88f) : new Color(0.08f, 0.08f, 0.09f, 0.7f);
             coverChip.gameObject.SetActive(!string.IsNullOrEmpty(coverBadge.text));
+            objective.text = model.Ended ? "" : model.ObjectiveText ?? "";
+            objective.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(objective.text));
 
             // Top right: score.
             scoreText.text = model.Score.ToString("N0");
@@ -284,6 +289,13 @@ namespace NightSupermarket.Game
             UiTheme.Stretch(coverBadge, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             coverChip.gameObject.SetActive(false);
             crowdChip.gameObject.SetActive(false);
+
+            // Special night objective
+            var goalChip = UiTheme.Fill(canvas, "Night objective", new Color(0.2f, 0.15f, 0.04f, 0.85f), UiTheme.Round);
+            UiTheme.Pin(goalChip, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -246), new Vector2(480, 32));
+            objective = UiTheme.Label(goalChip.transform, "Text", 17, UiTheme.Gold, TextAnchor.MiddleLeft, bold: true);
+            UiTheme.Stretch(objective, Vector2.zero, Vector2.one, new Vector2(16, 0), new Vector2(-12, 0));
+            goalChip.gameObject.SetActive(false);
 
             // Score card
             var score = UiTheme.Fill(canvas, "Score", UiTheme.Chip, UiTheme.Round);

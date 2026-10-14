@@ -25,7 +25,13 @@ namespace NightSupermarket.Game
         public float bobAmount = 0.028f;
         [Tooltip("Speed above which the camera widens as if sprinting.")]
         public float sprintFovSpeed = 4f;
-        private float pitch, sensitivity, eyeHeight, bobPhase, bobWeight, speed;
+        private float pitch, sensitivity, eyeHeight, bobPhase, bobWeight, speed, crouch;
+        /// <summary>Mouse sensitivity from Settings (1 = the rules asset's value).</summary>
+        public static float SensitivityScale = 1f;
+        /// <summary>Flip vertical look (Settings).</summary>
+        public static bool InvertY;
+        /// <summary>Set each frame from the motor: the eyes drop to crouching height.</summary>
+        public bool Crouching { get; set; }
         private Vector3 lastPosition, smoothedCamera;
         private Quaternion smoothedLook = Quaternion.identity;
         private bool snapped;
@@ -39,6 +45,9 @@ namespace NightSupermarket.Game
             if (interpolator == null) interpolator = gameObject.AddComponent<MotionInterpolator>();
             if (View != null) return;
             var cameraObject = new GameObject("Player View", typeof(Camera), typeof(AudioListener));
+            // Tagged so Camera.main finds the view you are playing through (disabled views are skipped by Unity):
+            // speech bubbles turn to face it and the crowd's level of detail is measured from it.
+            cameraObject.tag = "MainCamera";
             cameraObject.transform.SetParent(transform, false); cameraObject.transform.localPosition = Vector3.up * eyeHeight;
             View = cameraObject.GetComponent<Camera>(); View.nearClipPlane = 0.05f; View.fieldOfView = BaseFieldOfView;
             View.farClipPlane = 80; View.clearFlags = CameraClearFlags.SolidColor; View.backgroundColor = Color.black;
@@ -50,9 +59,9 @@ namespace NightSupermarket.Game
         private void Update()
         {
             if (!Active || View == null || Mouse.current == null || Cursor.lockState != CursorLockMode.Locked) return;
-            Vector2 look = Mouse.current.delta.ReadValue() * sensitivity;
+            Vector2 look = Mouse.current.delta.ReadValue() * sensitivity * SensitivityScale;
             transform.Rotate(0, look.x, 0);
-            pitch = Mathf.Clamp(pitch - look.y, -85, 85);
+            pitch = Mathf.Clamp(pitch - (InvertY ? -look.y : look.y), -85, 85);
         }
         private void LateUpdate()
         {
@@ -66,7 +75,9 @@ namespace NightSupermarket.Game
             bobPhase += delta * Mathf.Lerp(7f, 11f, Mathf.InverseLerp(2f, 5f, speed)) * Mathf.Clamp01(speed / 1.5f);
             float bob = Mathf.Sin(bobPhase) * bobAmount * bobWeight * Mathf.Clamp(speed / 3f, 0.4f, 1.4f);
             float sway = Mathf.Cos(bobPhase * 0.5f) * bobAmount * 0.6f * bobWeight;
-            Vector3 eyes = body + Vector3.up * (eyeHeight + bob) + transform.right * sway;
+            crouch = Mathf.MoveTowards(crouch, Crouching ? 1f : 0f, delta * 5f);
+            float eye = eyeHeight * Mathf.Lerp(1f, 0.62f, Mathf.SmoothStep(0f, 1f, crouch));
+            Vector3 eyes = body + Vector3.up * (eye + bob) + transform.right * sway;
             float fov = BaseFieldOfView + (speed > sprintFovSpeed ? 6f : 0f);
             var mode = Effective;
             if (mode == ViewMode.FirstPerson)
@@ -79,7 +90,7 @@ namespace NightSupermarket.Game
             {
                 // Orbit around a pivot at chest height. Shoulder: behind and a little to the right, looking
                 // where the body looks. Front: a mirror in front of you, looking back at the body.
-                Vector3 pivot = body + Vector3.up * (eyeHeight - 0.25f);
+                Vector3 pivot = body + Vector3.up * (eye - 0.25f);
                 Quaternion orbit = transform.rotation * Quaternion.Euler(pitch * 0.6f, 0, 0);
                 Vector3 wanted, lookAt;
                 if (mode == ViewMode.Shoulder)
@@ -90,7 +101,7 @@ namespace NightSupermarket.Game
                 else
                 {
                     wanted = pivot + transform.rotation * new Vector3(0.9f, 0.25f, 2.6f);
-                    lookAt = body + Vector3.up * (eyeHeight * 0.6f);
+                    lookAt = body + Vector3.up * (eye * 0.6f);
                 }
                 // Pull the camera in front of anything between the pivot and where it wants to be.
                 Vector3 toCamera = wanted - pivot;
@@ -106,6 +117,23 @@ namespace NightSupermarket.Game
                 fov = mode == ViewMode.Front ? 50f : BaseFieldOfView;
             }
             View.fieldOfView = Mathf.Lerp(View.fieldOfView, fov, 1f - Mathf.Exp(-6f * delta));
+        }
+    }
+    /// <summary>The camera the player is looking through right now (the main view, else any enabled on-screen camera).</summary>
+    public static class ViewCameras
+    {
+        /// <summary>A camera that stands in for the player's view (review captures render from their own rig).</summary>
+        public static Camera Override;
+        public static Camera Current
+        {
+            get
+            {
+                if (Override != null && Override.isActiveAndEnabled) return Override;
+                var main = Camera.main;
+                if (main != null) return main;
+                foreach (var camera in Camera.allCameras) if (camera.isActiveAndEnabled && camera.targetTexture == null) return camera;
+                return null;
+            }
         }
     }
 }

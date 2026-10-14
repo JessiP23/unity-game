@@ -89,6 +89,7 @@ namespace NightSupermarket.Game
             d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(9.4f, up, 10.5f), 90);
             d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(11.8f, up, 7.4f), 0);
             d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(5.0f, up, 6.2f), 180);
+            d.AddPoint(ZoneType.Mezzanine, PointKind.Browse, new Vector3(5.7f, up, 7.3f), 150); // watching the games demo
             // Atrium and toy store.
             Browse(d, ZoneType.Atrium, -5.5f, -21.0f, 180);
             Browse(d, ZoneType.Atrium, 5.5f, -27.0f, 0);

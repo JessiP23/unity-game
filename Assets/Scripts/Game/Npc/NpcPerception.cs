@@ -41,6 +41,12 @@ namespace NightSupermarket.Game
             CrowdBlind = 1f;
         }
 
+        /// <summary>Changes how far and how wide this person sees (a blackout, a phone torch), keeping what they already think.</summary>
+        public void SetSight(float range, float fieldOfView)
+        {
+            sensor = new VisionSensor(range, fieldOfView, ~(1 << 2)) { CloseRange = Mathf.Min(2.4f, range), CloseFieldOfView = 190f };
+        }
+
         /// <summary>Called by the controller on the state authority only.</summary>
         public void Tick(float delta)
         {
@@ -69,7 +75,7 @@ namespace NightSupermarket.Game
                     trackers[target] = tracker;
                 }
                 bool visible = false;
-                if (target.Noticeable && (target.transform.position - transform.position).sqrMagnitude <= reach * reach)
+                if (target.Noticeable && !target.Hidden && (target.transform.position - transform.position).sqrMagnitude <= reach * reach)
                     visible = sensor.CanSee(eye, forward, target.AimPoint, target.transform).Visible;
                 Vector3 p = target.transform.position;
                 if (tracker.Tick(visible, target.Speed, new MapPoint(p.x, p.y, p.z), elapsed, Concealment(target))) ReportReady?.Invoke(target, tracker);

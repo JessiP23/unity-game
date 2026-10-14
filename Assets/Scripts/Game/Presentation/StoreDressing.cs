@@ -125,6 +125,10 @@ namespace NightSupermarket.Game
             Signs(fixed_, lighting);
             DepartmentDressing.Signs(fixed_, placementZone);
             Fixtures(live, lighting, art);
+            if (art) DepartmentDressing.Gallery(fixed_, lighting, rng);
+            DepartmentDressing.GalleryShell(fixed_, lighting);
+            // Seats read each model's own cushion from its vertices, so they are found before batching merges the meshes.
+            Seating.Furnish(root); // sofas, armchairs, ottomans and benches you can sit on
             Batch(fixed_);
             lighting.Apply(mode);
         }

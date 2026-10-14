@@ -78,6 +78,7 @@ namespace NightSupermarket.Tests.PlayMode
             var texture = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
             var pixels = new Texture2D(1280, 720, TextureFormat.RGB24, false);
             rig.targetTexture = texture;
+            ViewCameras.Override = rig; // bubbles, tags and the crowd's detail follow the capture camera
             try
             {
                 foreach (var view in Views)
@@ -145,6 +146,50 @@ namespace NightSupermarket.Tests.PlayMode
                 }
                 foreach (var wet in Object.FindObjectsByType<WetFloor>(FindObjectsSortMode.None)) Object.Destroy(wet.gameObject);
 
+                // The gallery upstairs, a rider on a carousel horse, a mannequin on the gallery sofa, and a live stream.
+                rig.transform.position = new Vector3(4.0f, 5.3f, 6.0f); rig.transform.LookAt(new Vector3(11f, 3.6f, 11f));
+                for (int i = 0; i < 3; i++) yield return null;
+                Save(rig, texture, pixels, Path.Combine(folder, "gallery.png"));
+                rig.transform.position = new Vector3(6.0f, 4.9f, 8.8f); rig.transform.LookAt(new Vector3(6.6f, 4.1f, 5.6f));
+                for (int i = 0; i < 3; i++) yield return null;
+                Save(rig, texture, pixels, Path.Combine(folder, "gallery_demo.png"));
+                var rider = root.MannequinAt(0);
+                var carousel = Object.FindAnyObjectByType<CarouselRide>();
+                if (carousel != null && carousel.Seats.Count > 0 && carousel.Seats[0].TryInteract(rider))
+                {
+                    yield return new WaitForSeconds(0.6f);
+                    var saddle = rider.Seat;
+                    Vector3 outward = saddle.position - carousel.transform.position; outward.y = 0f; outward.Normalize();
+                    rig.transform.position = saddle.position + outward * 2.4f + saddle.forward * 1.2f + Vector3.up * 0.2f; rig.transform.LookAt(saddle.position + Vector3.up * 0.2f);
+                    for (int i = 0; i < 2; i++) yield return null;
+                    Save(rig, texture, pixels, Path.Combine(folder, "carousel_rider.png"));
+                    rider.Dismount();
+                }
+                SeatSpot sofa = null;
+                foreach (var s in SeatSpot.All) if (s != null && s.What == "the sofa" && s.transform.position.y > PrimitiveWorld.UpstairsY - 0.5f) sofa = s;
+                if (sofa != null && sofa.TryInteract(rider))
+                {
+                    yield return new WaitForSeconds(0.6f);
+                    var seat = rider.Seat;
+                    rig.transform.position = seat.position + seat.forward * 2.3f + Vector3.up * 0.55f; rig.transform.LookAt(seat.position + Vector3.up * 0.25f);
+                    for (int i = 0; i < 2; i++) yield return null;
+                    Save(rig, texture, pixels, Path.Combine(folder, "sofa_sit.png"));
+                    rider.Dismount();
+                }
+                root.Population.Budget = Mathf.Max(root.Population.Budget, 12);
+                var star = root.Crowd.StartStream(new Vector3(-0.6f, 0f, -21.5f), 180f, true);
+                if (star != null)
+                {
+                    yield return new WaitForSeconds(1.2f);
+                    rig.transform.position = star.transform.position + new Vector3(0f, 3.2f, 4.6f); rig.transform.LookAt(star.transform.position + new Vector3(0f, 0.4f, -3.5f));
+                    for (int i = 0; i < 2; i++) yield return null;
+                    Save(rig, texture, pixels, Path.Combine(folder, "live_stream.png"));
+                    rig.transform.position = star.transform.position + new Vector3(1.4f, 2.1f, 1.8f); rig.transform.LookAt(star.transform.position + Vector3.up * 1.9f);
+                    for (int i = 0; i < 2; i++) yield return null;
+                    Save(rig, texture, pixels, Path.Combine(folder, "live_tag.png"));
+                    star.Depart();
+                }
+
                 var hud = GameObject.Find("Prototype HUD");
                 if (hud != null)
                 {
@@ -177,6 +222,7 @@ namespace NightSupermarket.Tests.PlayMode
             }
             finally
             {
+                ViewCameras.Override = null;
                 rig.targetTexture = null;
                 Object.Destroy(texture); Object.Destroy(pixels); Object.Destroy(rig.gameObject);
                 Cursor.lockState = CursorLockMode.None;

@@ -61,7 +61,7 @@ namespace NightSupermarket.Game
             Level = level; shift = shiftNumber;
             population.Level = level;
             var settings = population.Settings;
-            population.Budget = governBudget ? Mathf.Clamp(settings.startingBudget, settings.budgetFloor, settings.maxActiveCustomers) : settings.maxActiveCustomers;
+            population.Budget = governBudget ? Mathf.Clamp(Mathf.Min(settings.startingBudget, GameSettings.CrowdCeiling), settings.budgetFloor, settings.maxActiveCustomers) : settings.maxActiveCustomers;
             // Forty agents re-pathing after a sale call should all have routes within a frame or two.
             NavMesh.pathfindingIterationsPerFrame = Mathf.Max(NavMesh.pathfindingIterationsPerFrame, 400);
             this.sales = CrowdPlan.SalesFor(shiftNumber, DifficultyRules.Sales(Difficulty));
@@ -264,7 +264,7 @@ namespace NightSupermarket.Game
         /// </summary>
         private void UpdateDetail()
         {
-            var eyes = Camera.main;
+            var eyes = ViewCameras.Current;
             if (eyes == null) return;
             Vector3 from = eyes.transform.position;
             foreach (var npc in population.Active)
@@ -302,7 +302,7 @@ namespace NightSupermarket.Game
             var settings = population.Settings;
             int customers = population.Customers;
             int basis = Mathf.Min(population.Budget, customers + 2);
-            int next = CrowdBudget.Next(basis, mean, SmoothFrameMs, settings.budgetFloor, settings.maxActiveCustomers);
+            int next = CrowdBudget.Next(basis, mean, SmoothFrameMs, settings.budgetFloor, Mathf.Min(settings.maxActiveCustomers, GameSettings.CrowdCeiling));
             if (next < basis) { cooldown = 6f; next = Mathf.Max(next, Mathf.Min(basis, customers - 4)); next = Mathf.Max(next, settings.budgetFloor); }
             else if (next == basis) next = population.Budget; // holding steady: keep the headroom already earned
             population.Budget = next;
@@ -311,7 +311,7 @@ namespace NightSupermarket.Game
 
         private void SendOneHome()
         {
-            var eyes = Camera.main;
+            var eyes = ViewCameras.Current;
             if (eyes == null) return;
             CustomerBehavior farthest = null; float best = 0;
             foreach (var npc in population.Active)
