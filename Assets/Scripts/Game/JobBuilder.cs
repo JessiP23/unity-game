@@ -108,6 +108,8 @@ namespace NightSupermarket.Game
                     case "top-shelf-robot": BuildRobot(); break;
                     case "fragile-vase": BuildVases(); break;
                     case "tv-channel": BuildTvChannels(); break;
+                    case "water-planters": BuildPlanters(); break;
+                    case "pillows-upstairs": BuildPillows(); break;
                 }
         }
 
@@ -121,6 +123,68 @@ namespace NightSupermarket.Game
         public void AfterSeating()
         {
             foreach (var job in Jobs) if (job.Id == "sofa-shoot") BuildSofaShoot();
+        }
+
+        // ---------------- the atrium and the carry upstairs ----------------
+
+        private readonly List<HoldSpot> planters = new List<HoldSpot>();
+        private PhysicalItem pillows;
+        public Transform GalleryRug { get; private set; }
+
+        /// <summary>Two of the four stone planters want watering: a watering can on the rim, E and 3 s still, in the cameras' sweep.</summary>
+        private void BuildPlanters()
+        {
+            Vector3[] pool = { new Vector3(-9.5f, 0f, -17.5f), new Vector3(9.5f, 0f, -17.5f), new Vector3(-9.5f, 0f, -30.5f), new Vector3(9.5f, 0f, -30.5f) };
+            var used = new List<int>();
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 planter = Pick(pool, used);
+                Vector3 inward = new Vector3(-Mathf.Sign(planter.x), 0f, 0f); // the open atrium floor is toward the middle
+                // The can stands on the rim on the floor side; the hold is on the planter itself (its box is what you aim at).
+                var can = PrimitiveWorld.Box(root, "Watering can", planter + new Vector3(0f, 0.86f, 0f) + inward * 0.55f, new Vector3(0.22f, 0.2f, 0.14f), new Color(0.2f, 0.5f, 0.3f));
+                UnityEngine.Object.DestroyImmediate(can.GetComponent<Collider>());
+                can.GetComponent<Renderer>().sharedMaterial = ArtLibrary.Lit(new Color(0.2f, 0.5f, 0.3f), 0.5f, 0.6f);
+                var spout = PrimitiveWorld.Box(root, "Can spout", can.transform.position + inward * 0.18f + Vector3.up * 0.06f, new Vector3(0.16f, 0.03f, 0.03f), new Color(0.2f, 0.5f, 0.3f));
+                UnityEngine.Object.DestroyImmediate(spout.GetComponent<Collider>());
+                spout.transform.rotation = Quaternion.Euler(0f, 0f, -20f * Mathf.Sign(inward.x));
+                // An invisible box over the rim, inside the planter's footprint: what E aims at (the probe ignores triggers, so it is solid).
+                var host = PrimitiveWorld.Box(root, "Planter watering", planter + new Vector3(0f, 0.9f, 0f) + inward * 0.6f, new Vector3(0.6f, 0.5f, 0.6f), Color.black);
+                host.layer = 3; host.GetComponent<Renderer>().enabled = false;
+                var spot = host.AddComponent<HoldSpot>();
+                spot.Configure(authority, signals, ActionKind.Place, "planter");
+                spot.Label = "Watering"; spot.Seconds = 3f; spot.KeepOnCancel = 0f;
+                spot.StartHint = "E — water this planter (3 s still)"; spot.DoneHint = "Watered";
+                spot.MovedHint = "You moved — the can stopped pouring";
+                var leaves = can;
+                spot.Completed += _ =>
+                {
+                    leaves.GetComponent<Renderer>().sharedMaterial = ArtLibrary.Emissive(new Color(0.3f, 0.9f, 0.5f), 0.8f);
+                    int left = 0; foreach (var p in planters) if (!p.Complete) left++;
+                    Toast(left > 0 ? "Watered. One more planter." : "Both planters watered.");
+                };
+                planters.Add(spot);
+                ObjectiveDressing.Sign(root, "WATER ME · E", planter + new Vector3(0f, 1.5f, 0f) + inward * 0.6f, planter.x < 0f ? 90f : -90f, DarkPanel, new Color(1f, 0.85f, 0.35f), 0.4f, 0.07f);
+            }
+        }
+
+        /// <summary>A stack of throw pillows on the Home ottoman, to be carried up to the gallery sofa's rug.</summary>
+        private void BuildPillows()
+        {
+            var data = ScriptableObject.CreateInstance<ItemDefinition>(); data.id = "pillows";
+            data.displayName = "Throw pillows"; data.missionTag = "pillows"; data.mass = 0.6f;
+            Vector3 at = new Vector3(11.1f, 0.6f, 0.9f); // on the ottoman in the Home living room
+            var box = PrimitiveWorld.Box(root, "Throw pillows", at, new Vector3(0.42f, 0.22f, 0.42f), new Color(0.85f, 0.55f, 0.45f));
+            box.layer = 3;
+            pillows = box.AddComponent<PhysicalItem>(); pillows.Configure(data, signals);
+            if (!ObjectiveDressing.Dress(box, "throw_pillows_01", 0.22f, 15f, new Color(0.85f, 0.55f, 0.45f)))
+                ObjectiveDressing.Recolor(box, new Color(0.85f, 0.55f, 0.45f), 0.1f);
+            ObjectiveDressing.Sign(root, "PILLOWS · E · TAKE UPSTAIRS", at + new Vector3(0f, 0.6f, 0f), 0f, DarkPanel, new Color(1f, 0.85f, 0.35f), 0.4f, 0.07f);
+            float up = PrimitiveWorld.UpstairsY;
+            var rug = PrimitiveWorld.Box(root, "Gallery drop rug", new Vector3(9.8f, up + 0.15f, 9.4f), new Vector3(1.7f, 0.3f, 1.7f), new Color(0.5f, 0.3f, 0.2f));
+            rug.AddComponent<PlacementZone>().destinationId = "gallery";
+            ObjectiveDressing.Surface(rug, "ribbed_corduroy", new Vector2(2, 2), new Color(0.55f, 0.6f, 0.8f), new Color(0.3f, 0.35f, 0.55f));
+            GalleryRug = rug.transform;
+            ObjectiveDressing.Sign(root, "GALLERY RUG · G TO SET DOWN", new Vector3(9.8f, up + 1.6f, 9.4f), 0f, new Color(0.2f, 0.25f, 0.45f), Color.white, 0.5f, 0.09f);
         }
 
         // ---------------- upstairs: the gallery ----------------
@@ -275,7 +339,47 @@ namespace NightSupermarket.Game
                 if (item.Body != null) { item.Body.position = target; item.Body.linearVelocity = Vector3.zero; }
                 moved++;
             }
+            if (toy != null && !Reachable(toy.transform.position)) moved += MoveToyToReachableSpot();
             return moved;
+        }
+
+        // The lost toy's spots. One can end up in a pocket the furniture closes off, so the toy moves to the next open spot.
+        private static readonly Vector3[] ToySpots = { new Vector3(11.2f, 0.82f, -5.2f), new Vector3(12.0f, 0.1f, 3.2f), new Vector3(9.6f, 0.1f, -3.0f), new Vector3(10.6f, 0.1f, 2.6f) };
+        // The second and third used to sit by the armchair and by the Home shelf: with the sofa set, the Home table and
+        // the Home promotion stand around them, both could end up in a pocket nobody can walk into.
+
+        /// <summary>
+        /// Once the dressing's obstacles have carved the NavMesh (a few frames after loading), moves the lost toy if
+        /// its spot turned out to be closed off.
+        /// </summary>
+        public void CheckToyReachable()
+        {
+            if (toy != null && toy.Holder == null && toy.gameObject.activeInHierarchy && !Reachable(toy.transform.position)) MoveToyToReachableSpot();
+        }
+
+        /// <summary>Can someone walking in from the front of the store get within reach of this point?</summary>
+        private static bool Reachable(Vector3 at)
+        {
+            if (!UnityEngine.AI.NavMesh.SamplePosition(new Vector3(0f, 0f, -11f), out var start, 3f, UnityEngine.AI.NavMesh.AllAreas)) return true; // no NavMesh to judge by
+            if (!UnityEngine.AI.NavMesh.SamplePosition(at, out var end, 2f, UnityEngine.AI.NavMesh.AllAreas)) return false;
+            var path = new UnityEngine.AI.NavMeshPath();
+            return UnityEngine.AI.NavMesh.CalculatePath(start.position, end.position, UnityEngine.AI.NavMesh.AllAreas, path) && path.status == UnityEngine.AI.NavMeshPathStatus.PathComplete;
+        }
+
+        private Transform toySign;
+
+        private int MoveToyToReachableSpot()
+        {
+            foreach (var spot in ToySpots)
+            {
+                if (!Reachable(spot)) continue;
+                toy.transform.position = spot;
+                if (toySign != null) toySign.position = spot + new Vector3(0f, 0.5f, 0f);
+                if (toy.Body != null) { toy.Body.position = spot; toy.Body.linearVelocity = Vector3.zero; }
+                Debug.LogWarning("[JOBS] the lost toy's spot was closed off by furniture; moved it to " + spot);
+                return 1;
+            }
+            return 0;
         }
 
         public string How(string missionId) => JobCatalog.Find(missionId)?.How ?? "";
@@ -625,13 +729,13 @@ namespace NightSupermarket.Game
         {
             var toyData = ScriptableObject.CreateInstance<ItemDefinition>(); toyData.id = "toy";
             toyData.displayName = "Lost toy"; toyData.missionTag = "toy"; toyData.inventoryOnly = true; toyData.slotCost = 1;
-            Vector3[] pool = { new Vector3(11.2f, 0.82f, -5.2f), new Vector3(12.6f, 0.5f, 2.1f), new Vector3(13.5f, 0.3f, -3.4f) };
-            Vector3 at = shift == 0 ? pool[0] : pool[layout.Next(pool.Length)];
+            var pool = ToySpots;
+            Vector3 at = shift == 0 ? pool[0] : pool[layout.Next(3)]; // the first three, so earlier shifts keep their layout
             var box = PrimitiveWorld.Box(root, "Lost toy", at, new Vector3(0.22f, 0.12f, 0.16f), new Color(0.9f, 0.3f, 0.3f));
             box.layer = 3;
             toy = box.AddComponent<PhysicalItem>(); toy.Configure(toyData, signals);
             ObjectiveDressing.Dress(box, "gamepad", 0.12f, layout.Next(0, 360), new Color(0.9f, 0.3f, 0.3f));
-            ObjectiveDressing.Sign(root, "LOST TOY · E", at + new Vector3(0, 0.5f, 0), 0f, new Color(0.55f, 0.15f, 0.15f), Color.white, 0.4f, 0.07f);
+            toySign = ObjectiveDressing.Sign(root, "LOST TOY · E", at + new Vector3(0, 0.5f, 0), 0f, new Color(0.55f, 0.15f, 0.15f), Color.white, 0.4f, 0.07f);
             var desk = PrimitiveWorld.Box(root, "Lost and found", new Vector3(-6.0f, 1.2f, -13.3f), new Vector3(0.6f, 0.3f, 0.4f), new Color(0.3f, 0.3f, 0.32f));
             ObjectiveDressing.Dress(desk, "wicker_basket_02", 0.3f, 0f, new Color(0.3f, 0.3f, 0.32f));
             lostFound = desk.AddComponent<ReturnPoint>();
@@ -698,14 +802,34 @@ namespace NightSupermarket.Game
                     if (toy != null && toy.gameObject.activeInHierarchy) { at = toy.transform.position; label = "TOY"; return true; }
                     return false;
                 case "carousel-ride":
-                    at = PrimitiveWorld.CarouselCentre + Vector3.up * 0.3f; label = "CAROUSEL"; return true;
+                    {
+                        // The ride carves itself out of the walkable floor, so the marker stands at its edge on your side.
+                        Vector3 centre = PrimitiveWorld.CarouselCentre;
+                        Vector3 toward = motor.transform.position - centre; toward.y = 0f;
+                        if (toward.sqrMagnitude < 0.01f) toward = Vector3.back;
+                        Vector3 edge = centre + toward.normalized * (CarouselRide.Radius + 1.0f);
+                        if (!UnityEngine.AI.NavMesh.SamplePosition(edge, out var rim, 1.5f, UnityEngine.AI.NavMesh.AllAreas)) edge = centre + Vector3.back * (CarouselRide.Radius + 1.0f);
+                        else edge = rim.position;
+                        at = edge + Vector3.up * 0.3f; label = "CAROUSEL"; return true;
+                    }
+                case "water-planters":
+                    if (!Nearest(planters, motor, p => !p.Complete, out at, "PLANTER", ref label)) return false;
+                    at = new Vector3(at.x - Mathf.Sign(at.x) * 1.2f, 0.3f, at.z); // on the atrium floor beside the planter
+                    return true;
+                case "pillows-upstairs":
+                    if (held != null && held.Definition.missionTag == "pillows") { at = GalleryRug.position; label = "GALLERY RUG"; return true; }
+                    if (held != null) return false;
+                    if (pillows == null || pillows.Holder != null || !pillows.gameObject.activeInHierarchy) return false;
+                    at = pillows.transform.position; label = "PILLOWS"; return true;
                 case "tv-channel":
                     if (!Nearest(channels, motor, c => !c.Complete, out at, "TV · CH", ref label)) return false;
                     at = new Vector3(at.x, PrimitiveWorld.UpstairsY + 0.3f, 13.3f); // on the floor in front of the wall
                     return true;
                 case "sofa-shoot":
                     if (sofa == null || sofa.Seats.Count == 0) return false;
-                    at = sofa.StandUpPoint(sofa.Seats[0]) + Vector3.up * 0.3f; label = "SOFA · PHOTO"; return true;
+                    at = sofa.StandUpPoint(sofa.Seats[0]);
+                    if (UnityEngine.AI.NavMesh.SamplePosition(at, out var walk, 1.5f, UnityEngine.AI.NavMesh.AllAreas)) at = walk.position; // the nearest walkable floor in front of it
+                    at += Vector3.up * 0.3f; label = "SOFA · PHOTO"; return true;
                 case "top-shelf-robot":
                     if (held != null || robot == null || !robot.gameObject.activeInHierarchy) return false;
                     // The robot is 3 m up; the marker stands on the floor in front of the stool you climb.
@@ -727,6 +851,7 @@ namespace NightSupermarket.Game
                 if (job.Complete) continue;
                 if (job.Rule.Id == "place-crate" && held.Definition.missionTag == "object") return "Follow the gold marker. G sets the crate down on the green rug.";
                 if (job.Rule.Id == "fragile-vase" && held.Definition.missionTag == "vase") return "Carry it gently to the Home rug. It rattles, and a hard drop breaks it. G sets it down.";
+                if (job.Rule.Id == "pillows-upstairs" && held.Definition.missionTag == "pillows") return "Up the escalator (it counts as moving) or the stairs. G sets them down on the gallery rug.";
             }
             return "Press G to put it down.";
         }

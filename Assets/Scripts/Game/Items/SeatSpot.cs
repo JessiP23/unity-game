@@ -99,13 +99,20 @@ namespace NightSupermarket.Game
             {
                 Vector3 floor = seat.position - Vector3.up * Drop(seat) + Vector3.up * 0.03f;
                 Vector3 front = seat.forward; front.y = 0f; front.Normalize();
-                foreach (var offset in new[] { front * 0.7f, front * 0.95f, seat.right * 0.8f, -seat.right * 0.8f, -front * 0.8f })
-                    candidates.Add(floor + offset);
+                // Step out from the seat until a body fits (a sofa's depth and the gap to a coffee table vary), then try the sides.
+                Vector3 side = Vector3.Cross(Vector3.up, front);
+                for (float d = 0.5f; d <= 1.6f; d += 0.1f) candidates.Add(floor + front * d);
+                for (float k = 0.7f; k <= 1.5f; k += 0.2f) { candidates.Add(floor + front * 0.5f + side * k); candidates.Add(floor + front * 0.5f - side * k); }
             }
             const float r = 0.28f;
-            foreach (var at in candidates)
-                if (!Physics.CheckCapsule(at + Vector3.up * (r + 0.05f), at + Vector3.up * (PlayerMotor.StandHeight - r), r, ~(1 << 2), QueryTriggerInteraction.Ignore))
+            // Prefer a free spot on walkable floor (so the guide marker and the shoppers can reach it), then any free spot.
+            for (int pass = 0; pass < 2; pass++)
+                foreach (var at in candidates)
+                {
+                    if (Physics.CheckCapsule(at + Vector3.up * (r + 0.05f), at + Vector3.up * (PlayerMotor.StandHeight - r), r, ~(1 << 2), QueryTriggerInteraction.Ignore)) continue;
+                    if (pass == 0 && !UnityEngine.AI.NavMesh.SamplePosition(at, out _, 0.35f, UnityEngine.AI.NavMesh.AllAreas)) continue;
                     return at;
+                }
             return candidates.Count > 0 ? candidates[0] : seat.position;
         }
     }

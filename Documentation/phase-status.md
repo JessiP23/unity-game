@@ -28,6 +28,7 @@
 | Redesign 9 | Hide in the crowd, crowds at jobs with quiet windows, heat map and job crowd chip, families/phone zombies/influencer/cleaners/restockers, shift card (Relaxed/Normal/Rush hour), night metrics | Compiled, 104 Core tests pass 2026-10-13; MallCrowdLifeTests (PlayMode) need a Mac run. See redesign.md |
 | Redesign 10 | Crouch and hiding spots, main menu, settings (volume, mouse, graphics, full screen), four special nights (Blackout, Kids' birthday party, Black Friday, Jewellery heist) and a featured night | Compiled, 108 Core tests pass 2026-10-13; MallNightsTests (PlayMode) need a Mac run. See redesign.md |
 | Redesign 11 | Sit on carousel horses, sofas and benches; the ride counts a whole turn; speech bubbles readable from any side (player camera is MainCamera); live stream tag, shot, fans and shout-outs; the upstairs gallery dressed, with TV-channel and catalogue-photo jobs | Compiled, 108 Core tests pass 2026-10-14; MallSeatsTests (PlayMode) need a Mac run. See redesign.md |
+| Redesign 12 | The guard walks over on Red and looks you over up close (a fitting pose fools him, a plank is grabbed); one job per area each night (supermarket, mall, gallery) with planters and pillows jobs; end card layout and unlock line | Compiled, 108 Core tests pass 2026-10-14; GuardInspectionTests (PlayMode) need a Mac run. See redesign.md |
 | Art | Models, environment, animations, audio, UI | After programming acceptance |
 | Polish | Final refinement | After asset integration |
 

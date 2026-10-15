@@ -217,6 +217,13 @@ namespace NightSupermarket.Tests.PlayMode
                     for (int i = 0; i < 3; i++) yield return null;
                     Save(rig, texture, pixels, Path.Combine(folder, "shift_card.png"));
                     card.Hide();
+                    // The end card, with a long night's worth of score lines, so overflow shows up in review.
+                    foreach (var evt in new[] { ScoreEvent.RequiredJob, ScoreEvent.RequiredJob, ScoreEvent.OptionalJob, ScoreEvent.CloseCall, ScoreEvent.CloseCall, ScoreEvent.PoseMatch,
+                        ScoreEvent.Admired, ScoreEvent.Gem, ScoreEvent.Wish, ScoreEvent.Dare, ScoreEvent.Shoutout, ScoreEvent.Present, ScoreEvent.Report, ScoreEvent.Capture })
+                        root.Score.Add(evt);
+                    root.Authority.DebugAdvance(100000);
+                    for (int i = 0; i < 6; i++) yield return null;
+                    Save(rig, texture, pixels, Path.Combine(folder, "end_card.png"));
                     canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 }
             }

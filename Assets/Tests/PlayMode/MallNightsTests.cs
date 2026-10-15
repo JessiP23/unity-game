@@ -33,13 +33,21 @@ namespace NightSupermarket.Tests
         {
             yield return Load();
             var root = Object.FindAnyObjectByType<PrototypeRoot>();
+            root.Population.Budget = 0;
+            foreach (var npc in new List<NpcController>(root.Population.Active)) npc.Depart(); // nobody to bump into
             var player = root.MannequinAt(0);
             player.Teleport(new Vector3(-2.5f, 0.1f, -4.6f)); player.transform.rotation = Quaternion.identity;
-            yield return Hold(root.InputAt(0), 0.8f, new Vector2(0, 1), true);
+            yield return Hold(root.InputAt(0), 0.6f, new Vector2(0, 1), true);
             Assert.That(player.Crouched, Is.True);
+            // Walking pace measured on the floor plane over a stretch, not one physics step.
+            Vector3 from = player.transform.position;
+            yield return Hold(root.InputAt(0), 0.5f, new Vector2(0, 1), true);
+            Vector3 travelled = player.transform.position - from; travelled.y = 0f;
+            float pace = travelled.magnitude / 0.5f;
             Assert.That(player.GetComponent<PerceptionTarget>().aimHeight, Is.LessThan(0.7f), "watchers aim lower, so counters block them");
             Assert.That(player.GetComponent<CharacterController>().height, Is.LessThan(1.3f));
-            Assert.That(player.ActualSpeed, Is.LessThan(player.Rules.walkSpeed * PlayerMotor.CrouchPace + 0.2f), "crouched walking is slow");
+            Assert.That(pace, Is.LessThan(player.Rules.walkSpeed * PlayerMotor.CrouchPace + 0.2f), "crouched walking is slow (" + pace.ToString("0.00") + " m/s)");
+            Assert.That(pace, Is.GreaterThan(0.3f), "but you still move");
             yield return Hold(root.InputAt(0), 0.3f, Vector2.zero, false);
             Assert.That(player.Crouched, Is.False, "standing up in the open");
         }

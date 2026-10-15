@@ -46,6 +46,9 @@ every job goes quiet for 15 s about once a minute — the job card under NEXT co
 kids (they point), the influencer's red shot on the floor (hold a pose in it for a shout-out), and cleaners' wet floors (don't run on them).
 The mall gets busier the more nights you play, and twice a night a FLASH SALE floods one department —
 usually one your jobs are in. Watch the countdown under the clock and plan around the crowd.
+If the guard sees you move, freeze — and then hold a pose that fits the department (right mouse): he walks
+over to look, and up close a body that just stands there gets grabbed. Every night sends you across the whole
+mall: one job on the shop floor, one out in the atrium or toy store, one up in the gallery.
 Every night has a dare (Tab, Night page) worth points and a gem; do the daily shift's dare on
 consecutive days to build a streak. Toss a coin in the fountain for the night's wish (the splash
 brings the guard). Any Clothing rack or table lends you clothes (E). Get caught and you go down like a

@@ -84,6 +84,8 @@ namespace NightSupermarket.Game
         public bool Solo => pawns.Count == 1;
         private bool restarting;
         public PlayerMotor MannequinAt(int index) => pawns[index].Motor;
+        /// <summary>The guard's view of one mannequin (tests).</summary>
+        public DetectionCoordinator DetectionAt(int index) => pawns[index].Detection;
         public PlayerInputReader InputAt(int index) => pawns[index].Input;
         public MissionSystem Missions => missions;
         private int active;
@@ -218,6 +220,7 @@ namespace NightSupermarket.Game
             var surface = gameObject.AddComponent<NavMeshSurface>(); surface.collectObjects = CollectObjects.Children;
             surface.layerMask = 1; surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders; surface.BuildNavMesh();
             int snapped = jobs.SnapLooseItemsToFloor();
+            StartCoroutine(AfterCarving());
             if (snapped > 0) Debug.LogWarning("[JOBS] " + snapped + " item(s) spawned inside furniture on shift " + shift + " and were moved to open floor. Check the position pools in JobBuilder.");
             BuildGuard();
             foreach (var pawn in pawns)
@@ -687,6 +690,74 @@ namespace NightSupermarket.Game
         private Dare dare;
         private bool dareDone, coinTossed, ranTonight;
         private int dareStreak;
+        /// <summary>Furniture carves the NavMesh a frame or two after it is placed; checks that need the final floor wait for it.</summary>
+        private System.Collections.IEnumerator AfterCarving()
+        {
+            yield return null; yield return null;
+            yield return new WaitForFixedUpdate();
+            jobs?.CheckToyReachable();
+        }
+
+        // The close look: the guard stands over a mannequin he saw move. A pose that fits the department (or display
+        // clothes, the crowd, a seat) fools him in a couple of seconds; a body just standing there does not, and a hiding
+        // spot he has walked right up to is a hiding spot he has found.
+        public const float InspectSeconds = 2.5f, FooledSeconds = 1.8f;
+        private readonly Dictionary<PlayerMotor, float> inspectClock = new Dictionary<PlayerMotor, float>();
+        private PlayerMotor inspected;
+        private string inspectLine = "";
+        private float inspectUntil;
+        private void Inspect(string line) { inspectLine = line; inspectUntil = Time.time + 0.25f; }
+
+        private void TickInspection(Pawn pawn, bool isActive, float delta)
+        {
+            var motor = pawn.Motor;
+            var detection = pawn.Detection.Detection;
+            bool guardAi = guardController != null && !guardController.PlayerDriven;
+            Vector3 flat = guardAi ? guardController.transform.position - motor.transform.position : Vector3.zero; flat.y = 0f;
+            float distance = guardAi ? flat.magnitude : float.MaxValue;
+            bool suspicious = detection.State == DetectionState.Red || detection.State == DetectionState.Orange && detection.Suspicion.Value > 0
+                || guardController.Brain != null && (guardController.Brain.State == GuardState.Chase || guardController.Brain.State == GuardState.Investigate || guardController.Brain.State == GuardState.Search) && detection.State != DetectionState.Green;
+            bool close = guardAi && motor.Record.Free && pawn.Detection.Observed && distance < GuardController.InspectDistance && suspicious
+                && authority.Flow.Phase == MatchPhase.Night && Time.time >= pawn.ConvincedUntil;
+            inspectClock.TryGetValue(motor, out float clock);
+            if (!close)
+            {
+                if (clock != 0f) inspectClock[motor] = Mathf.MoveTowards(clock, 0f, delta * 2f);
+                if (inspected == motor) { inspected = null; guardController.LookOver(null); }
+                return;
+            }
+            if (inspected == null) { inspected = motor; guardController.LookOver(motor.transform); }
+            else if (inspected != motor) return; // one at a time
+            bool fooled = pawn.Detection.PoseCamouflage || pawn.Detection.CrowdCover || Covered(motor)
+                || motor.GetComponent<DisplayCamouflage>() is DisplayCamouflage dressed && dressed.Active;
+            clock += delta;
+            inspectClock[motor] = clock;
+            if (fooled)
+            {
+                if (isActive) Inspect("HE'S LOOKING YOU OVER · keep the pose · " + Mathf.CeilToInt(FooledSeconds - clock) + "s");
+                if (clock < FooledSeconds) return;
+                // Looked you up and down and bought it. For a while the same view will not start it all again.
+                inspectClock[motor] = 0f; inspected = null;
+                pawn.ConvincedUntil = Time.time + 8f;
+                detection.Reset();
+                guardController.LookOver(null, true);
+                pawn.CloseCallPending = false; pawn.SightingSlipped = true; // this is the close call; the Green transition does not add another
+                int pts = score.Add(ScoreEvent.CloseCall);
+                if (isActive) Toast("He looked you up and down. \"Huh. Just a mannequin.\"   +" + pts, 3f);
+                storeAudio?.Exhale();
+                return;
+            }
+            string fit = PoseLibrary.ExpectedIn(pawn.Mannequin.Zone) is Stance wanted && wanted != Stance.Neutral ? wanted.ToString() : "a display pose";
+            if (isActive) Inspect("HE'S RIGHT ON YOU · hold " + fit + " (right mouse), or sit · " + Mathf.CeilToInt(InspectSeconds - clock) + "s");
+            if (clock < InspectSeconds) return;
+            inspectClock[motor] = 0f; inspected = null;
+            guardController.LookOver(null);
+            if (isActive) Toast("\"Gotcha.\" A mannequin that just stands in the aisle fools nobody up close.", 3.5f);
+            var carry = motor.GetComponent<CarrySystem>();
+            if (carry != null) carry.Release(false);
+            authority.TryCapture(motor.Record.Id);
+        }
+
         private float carouselSeconds, hushUntil = -1f;
         // The live stream: are you in the shot, how long you have held a pose in it, and which stream already gave you a shout-out.
         private bool inShot;
@@ -945,7 +1016,11 @@ namespace NightSupermarket.Game
                     var now = detection.State;
                     if (now != before)
                     {
-                        if (now == DetectionState.Orange && detection.FreshSighting)
+                        if (now == DetectionState.Orange && detection.FreshSighting && Time.time < pawn.ConvincedUntil)
+                        {
+                            // He just looked you over and bought it: the same view does not start a new sighting's alarms and rewards.
+                        }
+                        else if (now == DetectionState.Orange && detection.FreshSighting)
                         {
                             authority.Audio.Publish(AudioCue.DetectionWarning);
                             pawn.CloseCallPending = Time.time - pawn.LastMoved < 1.5f;
@@ -953,11 +1028,17 @@ namespace NightSupermarket.Game
                             if (pawn.Mannequin.Matches) { int pts = score.Add(ScoreEvent.PoseMatch); if (i == active) Toast("Perfect pose for " + HudText.ZoneLabel(pawn.Mannequin.Zone) + "   +" + pts, 2.5f); }
                             if (i == active) Tip("seen", "SEEN. Stop now. You have " + rules.orangeDuration.ToString("0.0") + " s before the guard is sure.", 5f);
                         }
+                        else if (now == DetectionState.Red && Time.time < pawn.ConvincedUntil)
+                        {
+                            // Still the mannequin he checked a moment ago. Moving now would change his mind (suspicion, then the chase).
+                        }
                         else if (now == DetectionState.Red)
                         {
                             authority.Audio.Publish(AudioCue.DetectionRed);
                             score.BreakStreak(); // the guard is sure he saw something: the clean run ends here
-                            if (i == active) Tip("red", "Frozen in his sight. Hold still: every move now adds a strike.", 5f);
+                            // He walks over to look. Up close, standing still is not enough: you need a pose that fits.
+                            if (!guardController.PlayerDriven && Time.time >= pawn.ConvincedUntil) guardController.LookInto(pawn.Motor.transform.position);
+                            if (i == active) Tip("red", "He saw that. He's coming to look — hold a pose that fits this department, or he'll grab you.", 5f);
                         }
                         else if (now == DetectionState.Discovered) authority.Audio.Publish(AudioCue.Discovery);
                         else if (now == DetectionState.Green && (before == DetectionState.Orange || before == DetectionState.Red))
@@ -985,6 +1066,7 @@ namespace NightSupermarket.Game
                         authority.TryCapture(pawn.Motor.Record.Id);
                     }
                     pawn.Pose.Tick();
+                    TickInspection(pawn, i == active, delta);
                     if (pawn.Detection.Observed || !pawn.Motor.Record.Free || Covered(pawn.Motor)) anyoneSeen = true;
                 }
                 observations[i] = pawn.Detection != null && pawn.Detection.Observed;
@@ -1566,9 +1648,11 @@ namespace NightSupermarket.Game
                 bool hidden = hiding != null && hiding.IsHidden(me);
                 var live = crowd.Stream;
                 bool shouted = live != null && shoutoutFrom == live.StreamId;
-                hudModel.CoverLive = !hidden && (inShot || (live != null && liveDistance < 14f && (cover == null || !cover.Covered) && nook == null));
-                hudModel.CoverOn = hidden || (cover != null && cover.Covered);
-                hudModel.CoverText = hidden ? "HIDDEN · nobody can see you — unless the guard walks right up"
+                bool inspecting = Time.time < inspectUntil;
+                hudModel.CoverLive = inspecting || (!hidden && (inShot || (live != null && liveDistance < 14f && (cover == null || !cover.Covered) && nook == null)));
+                hudModel.CoverOn = !inspecting && (hidden || (cover != null && cover.Covered));
+                hudModel.CoverText = inspecting ? inspectLine
+                    : hidden ? "HIDDEN · nobody can see you — unless the guard walks right up"
                     : inShot ? (shouted ? "● IN THE LIVE SHOT · don't move — it goes straight to the guard"
                         : streamHold > 0.1f ? "● ON THE STREAM · hold it… shout-out in " + Mathf.CeilToInt(LiveStream.ShoutoutSeconds - streamHold) + "s"
                         : "● IN THE LIVE SHOT · freeze, or hold a pose for a shout-out")
@@ -1708,6 +1792,21 @@ namespace NightSupermarket.Game
             FillEndCard();
         }
 
+        /// <summary>What this night opened up, or what the next one will: the special nights are easy to miss otherwise.</summary>
+        private string UnlockLine()
+        {
+            int nights = testRun ? 0 : PlayerPrefs.GetInt("ns-nights", 0);
+            foreach (var kind in NightKinds.Specials)
+                if (NightKinds.UnlocksAfter(kind) == nights) return "\n★ NEW NIGHT UNLOCKED: " + NightKinds.Name(kind) + " — pick it on the menu (N or ↑↓), then clock in";
+            foreach (var kind in NightKinds.Specials)
+                if (NightKinds.UnlocksAfter(kind) > nights)
+                {
+                    int left = NightKinds.UnlocksAfter(kind) - nights;
+                    return "\nNext special night: " + NightKinds.Name(kind) + " after " + left + " more night" + (left == 1 ? "" : "s");
+                }
+            return "";
+        }
+
         private void FillEndCard()
         {
             hudModel.Ended = ended && authority.Flow.Ended;
@@ -1722,7 +1821,8 @@ namespace NightSupermarket.Game
                 + " · " + authority.Stats.Reports + (authority.Stats.Reports == 1 ? " report" : " reports") + " · " + authority.Stats.Captures + (authority.Stats.Captures == 1 ? " capture" : " captures")
                 + "\n" + DifficultyRules.Name(difficulty) + " shift (score ×" + DifficultyRules.ScoreFactor(difficulty).ToString("0.0#") + ") · crowd " + CrowdPlan.LevelName(crowd != null ? crowd.Level : 0)
                 + (pawns.Count > 0 && pawns[0].Cover != null && pawns[0].Cover.CoveredSeconds >= 1 ? " · hid in the crowd for " + HudText.Clock(pawns[0].Cover.CoveredSeconds) : "")
-                + (crowd != null && crowd.InfluencerClips > 0 ? " · went viral " + crowd.InfluencerClips + "×" : "");
+                + (crowd != null && crowd.InfluencerClips > 0 ? " · went viral " + crowd.InfluencerClips + "×" : "")
+                + UnlockLine();
             // Collapse repeated events into one line each so the card stays short.
             var totals = new Dictionary<ScoreEvent, (int count, int points)>();
             foreach (var line in score.Lines)
@@ -1763,7 +1863,7 @@ namespace NightSupermarket.Game
             hudModel.PlayerName = me;
             hudModel.EditingName = editingName;
             string rank = myRank > 0 ? (myRank == 1 ? "You hold the top spot. " : "You are #" + myRank + ". ") : "";
-            hudModel.BoardNote = rank + (board.Online ? board.Status : "Scores stay on this Mac. To compare with friends, run Tools/leaderboard_server.py and set its URL — see README.");
+            hudModel.BoardNote = rank + (board.Online ? board.Status : "Scores stay on this Mac. To share with friends: Tools/leaderboard_server.py (see README).");
         }
 
         /// <summary>Letters and numbers only: Mac keyboards send F1-F12 as media keys and lack Home/End/Delete.</summary>
@@ -1850,6 +1950,8 @@ namespace NightSupermarket.Game
             /// <summary>True for the second it takes to fall over after a capture; the camera shows it.</summary>
             public bool Toppling;
             public bool CloseCallPending, SightingSlipped, FirstPersonShown = true;
+            /// <summary>Until when the guard, having looked this body over up close, takes it for a mannequin.</summary>
+            public float ConvincedUntil = -1f;
             /// <summary>Walking with the crowd (see <see cref="CrowdCover"/>).</summary>
             public CrowdCover Cover;
         }

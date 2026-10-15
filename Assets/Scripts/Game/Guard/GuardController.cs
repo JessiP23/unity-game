@@ -32,6 +32,10 @@ namespace NightSupermarket.Game
         private IDisposable hearing, reports;
         /// <summary>Last report this guard acted on; debug and tests read it.</summary>
         public SuspiciousActivityEvent? LastReport { get; private set; }
+        /// <summary>Someone he is looking over up close: he stands still and faces them (see <see cref="LookOver"/>).</summary>
+        public Transform Inspecting { get; private set; }
+        /// <summary>How close he comes to look a suspicious mannequin over.</summary>
+        public const float InspectDistance = 2.1f;
         private GuardVisionSystem vision;
         private bool playerDriven, searching;
         private float cruiseSpeed;
@@ -103,11 +107,31 @@ namespace NightSupermarket.Game
             agent.isStopped = false;
             Go(position);
         }
+        /// <summary>
+        /// He saw something move and it froze: he walks over to look at it (a report or a noise does the same).
+        /// Nothing happens while he is already chasing or grabbing someone.
+        /// </summary>
+        public void LookInto(Vector3 position)
+        {
+            if (Brain == null || Brain.State == GuardState.Chase || Brain.State == GuardState.Capture) return;
+            BeginInvestigation(position);
+        }
+
+        /// <summary>
+        /// Looking a mannequin over, up close: the body stops and turns to face it. Null ends the look; after a look
+        /// that fooled him, <paramref name="satisfied"/> sends him back to his round.
+        /// </summary>
+        public void LookOver(Transform who, bool satisfied = false)
+        {
+            Inspecting = who;
+            if (who == null && satisfied && Brain != null && Brain.State != GuardState.Capture) { Brain.Transition(GuardState.ReturnToPatrol); hasSent = false; }
+        }
+
         /// <summary>Repeat SetDestination calls make the agent rebuild its path and stutter in place.</summary>
         private void Go(Vector3 destination)
         {
             if (!NavMesh.SamplePosition(destination, out var hit, 3, NavMesh.AllAreas)) return;
-            if (hasSent && (hit.position - sentDestination).sqrMagnitude < 0.36f) return;
+            if (hasSent && agent.hasPath && (hit.position - sentDestination).sqrMagnitude < 0.36f) return; // a Warp or ResetPath drops the path: send again
             sentDestination = hit.position;
             hasSent = true;
             agent.isStopped = false;
@@ -165,12 +189,14 @@ namespace NightSupermarket.Game
                 canCapture = seen && detection.State == DetectionState.Discovered
                     && Vector3.Distance(transform.position, target.transform.position) < rules.captureDistance;
             }
-            bool arrived = !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.15f;
+            // Standing over someone is not arriving anywhere: the patrol does not tick on while he looks.
+            bool arrived = Inspecting == null && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.15f;
             Brain.Tick(arrived, threat, canCapture, delta);
             if (Brain.AdvancePatrol) waypoint = (waypoint + 1) % patrol.Length;
             bool search = Brain.State == GuardState.Search || Brain.State == GuardState.Capture;
-            searching = search;
-            agent.isStopped = search;
+            searching = search && Inspecting == null;
+            agent.isStopped = search || Inspecting != null;
+            if (Inspecting != null) return; // standing over someone: no new path until the look is over
             cruiseSpeed = (Brain.State == GuardState.Chase ? rules.guardChaseSpeed : rules.guardSpeed) * Pace;
             if (!search)
             {
@@ -182,6 +208,12 @@ namespace NightSupermarket.Game
         private void Update()
         {
             if (playerDriven || agent == null || rules == null || !agent.isOnNavMesh) return;
+            if (Inspecting != null)
+            {
+                Vector3 look = Inspecting.position - transform.position; look.y = 0f;
+                if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(look), rules.guardTurnSpeed * 2f * Time.deltaTime);
+                return;
+            }
             if (searching) { transform.Rotate(0, 45 * Time.deltaTime, 0); return; }
             Vector3 heading = agent.desiredVelocity; heading.y = 0;
             if (heading.sqrMagnitude < 0.04f) return;

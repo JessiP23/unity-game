@@ -100,7 +100,10 @@ namespace NightSupermarket.Tests
                 foreach (var seat in spot.Seats)
                 {
                     Vector3 stand = spot.StandUpPoint(seat);
-                    Assert.That(NavMesh.SamplePosition(stand, out _, 0.6f, NavMesh.AllAreas), Is.True, spot.name + ": getting up lands on open floor (" + stand + ")");
+                    // Room for a standing body (the NavMesh is eroded by the agent radius, so tight gaps between
+                    // furniture have none), and walkable floor close by.
+                    Assert.That(Physics.CheckCapsule(stand + Vector3.up * 0.35f, stand + Vector3.up * 1.5f, 0.28f, ~(1 << 2), QueryTriggerInteraction.Ignore), Is.False, spot.name + ": getting up lands in furniture (" + stand + ")");
+                    Assert.That(NavMesh.SamplePosition(stand, out _, 1.2f, NavMesh.AllAreas), Is.True, spot.name + ": getting up lands far from walkable floor (" + stand + ")");
                 }
             }
             Assert.That(benches, Is.EqualTo(4), "the atrium benches");
@@ -145,7 +148,7 @@ namespace NightSupermarket.Tests
             Assert.That(tv.TryInteract(player), Is.True, "E on the marked TV");
             yield return Still(root.InputAt(0), 2.6f);
             Assert.That(tv.Complete, Is.True, "held still 2 s: switched");
-            Assert.That(job.Count, Is.EqualTo(1));
+            Assert.That(job.Progress, Is.EqualTo(1));
         }
 
         [UnityTest] public IEnumerator ShopperBubblesFaceTheViewAndThePlayerCameraIsMain()
@@ -173,7 +176,7 @@ namespace NightSupermarket.Tests
             Assert.That(stream.TagText, Does.StartWith("● LIVE"));
             int fans = 0;
             foreach (var npc in root.Population.Active)
-                if (npc.Behavior is CustomerBehavior c && c.Following && c.Leader != null && c.Leader.Controller == star) fans++;
+                if (npc.Behavior is CustomerBehavior c && c.Following && c.Leader != null && c.Leader.gameObject == star.gameObject) fans++;
             Assert.That(fans, Is.EqualTo(2), "two fans tag along");
             Assert.That(star.Perception.Sensor.Range, Is.EqualTo(LiveStream.Range).Within(0.01f), "what they see is the shot");
             var player = root.MannequinAt(0);

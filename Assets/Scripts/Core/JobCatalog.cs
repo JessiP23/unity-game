@@ -22,10 +22,13 @@ namespace NightSupermarket.Core
         public MissionRule Rule() => new MissionRule(Id, Title, Kind, Tag, Quantity, Destination);
     }
 
+    /// <summary>Where in the mall a job takes you. A night draws one job from each, so every night crosses the whole mall.</summary>
+    public enum JobArea { Supermarket, Mall, Gallery }
+
     /// <summary>
-    /// The nine jobs and the draw. Shift 0 is the classic trio every test knows; any other shift
-    /// draws three jobs from the pool with no two from the same family, so a night mixes a carry,
-    /// a hold-still and a trick instead of three errands.
+    /// The jobs and the draw. Shift 0 is the classic trio every test knows; any other shift draws one job
+    /// on the supermarket floor, one out in the mall (atrium, toy store) and one up in the gallery, with no two
+    /// from the same family, so a night mixes a carry, a hold-still and a trick and sends you across all of it.
     /// </summary>
     public static class JobCatalog
     {
@@ -58,7 +61,19 @@ namespace NightSupermarket.Core
             new JobTemplate("sofa-shoot", "Sit for the catalogue photo on the gallery sofa", ActionKind.Place, "sofa", 1,
                 "Upstairs in the gallery lounge. E on the sofa to sit down, then keep still 15 s while the photographer's flash goes off. A seated mannequin is on display; sitting down and getting up are moving.", "Gallery", "sit"),
             new JobTemplate("top-shelf-robot", "Take the robot from the toy store's top shelf", ActionKind.Collect, "robot", 1,
-                "Toy store, tall shelf by the step stool. Climb the stool, E on the robot. Run past a toy shelf and it rattles.", "Toy store", "grab")
+                "Toy store, tall shelf by the step stool. Climb the stool, E on the robot. Run past a toy shelf and it rattles.", "Toy store", "grab"),
+            new JobTemplate("water-planters", "Water two of the atrium planters", ActionKind.Place, "planter", 2,
+                "The marked planters in the atrium. E at one and keep still 3 s while the can pours, twice. The atrium cameras sweep that floor: don't move in the red light.", "Atrium", "hold"),
+            new JobTemplate("pillows-upstairs", "Carry the throw pillows up to the gallery sofa", ActionKind.Place, "pillows", 1,
+                "The pillows are on the ottoman in Home. E picks them up; take the escalator or the stairs; G on the rug by the gallery sofa.", "Gallery", "carry", "gallery")
+        };
+
+        public static JobArea AreaOf(JobTemplate job) => job.Department switch
+        {
+            "Gallery" => JobArea.Gallery,
+            "Toy store" => JobArea.Mall,
+            "Atrium" => JobArea.Mall,
+            _ => JobArea.Supermarket
         };
 
         public static JobTemplate Find(string id)
@@ -71,18 +86,18 @@ namespace NightSupermarket.Core
         {
             if (shift == 0) return new[] { All[0], All[1], All[2] };
             var rng = new Random(shift * 104729 + 7);
-            var pool = new List<JobTemplate>(All);
             var picked = new List<JobTemplate>(PerNight);
             var families = new HashSet<string>();
-            while (picked.Count < PerNight && pool.Count > 0)
+            // One from each area, in the order a night walks them: the supermarket floor, out into the mall, up to the gallery.
+            foreach (var area in new[] { JobArea.Supermarket, JobArea.Mall, JobArea.Gallery })
             {
-                var job = pool[rng.Next(pool.Count)];
-                pool.Remove(job);
-                if (!families.Add(job.Family)) continue;
-                picked.Add(job);
+                var pool = new List<JobTemplate>();
+                foreach (var job in All) if (AreaOf(job) == area && !families.Contains(job.Family)) pool.Add(job);
+                if (pool.Count == 0) foreach (var job in All) if (AreaOf(job) == area) pool.Add(job); // never leave an area out
+                var chosen = pool[rng.Next(pool.Count)];
+                families.Add(chosen.Family);
+                picked.Add(chosen);
             }
-            // Fill from the pool if family limits left a slot empty (cannot happen with four families, kept for safety).
-            while (picked.Count < PerNight && pool.Count > 0) { picked.Add(pool[0]); pool.RemoveAt(0); }
             return picked;
         }
     }

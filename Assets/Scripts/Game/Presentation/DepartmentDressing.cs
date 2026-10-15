@@ -175,17 +175,17 @@ namespace NightSupermarket.Game
         {
             float up = PrimitiveWorld.UpstairsY;
             // Games demo by the balcony rail, screen toward the gallery.
-            var stand = Solid(ArtLibrary.Spawn("drawer_cabinet", parent, new Vector3(6.6f, up, 5.7f), 0));
-            if (stand != null)
-            {
-                float top = ArtLibrary.BoundsOf(stand).max.y;
-                var tv = ArtLibrary.Spawn("Television_01", parent, new Vector3(6.6f, top, 5.62f), 0);
-                if (tv != null) FitScreen(parent, tv, Vector3.forward, 0.56f, ArtLibrary.Screen(new Color(0.45f, 1f, 0.55f), ArtLibrary.ScreenShow.Broadcast, 7));
-                ArtLibrary.Spawn("gaming_console", parent, new Vector3(7.25f, top, 5.7f), 15);
-            }
+            // A low wooden TV bench (the drawer cabinet stood too tall: the screen sat at head height).
+            const float benchTop = 0.5f;
+            var bench = Panel(parent, "Games stand", new Vector3(6.6f, up + benchTop * 0.5f, 5.7f), new Vector3(1.3f, benchTop, 0.45f));
+            bench.sharedMaterial = ArtLibrary.Surface("wood_table_001", new Vector2(1.5f, 0.6f), new Color(0.62f, 0.45f, 0.3f), 0.45f) ?? ArtLibrary.Lit(new Color(0.45f, 0.32f, 0.2f), 0.4f);
+            Blocker(parent, "Games stand", new Vector3(6.6f, up, 5.7f), new Vector3(1.3f, benchTop, 0.45f));
+            var tv = ArtLibrary.Spawn("Television_01", parent, new Vector3(6.45f, up + benchTop, 5.66f), 0);
+            if (tv != null) FitScreen(parent, tv, Vector3.forward, 0.56f, ArtLibrary.Screen(new Color(0.45f, 1f, 0.55f), ArtLibrary.ScreenShow.Broadcast, 7));
+            ArtLibrary.Spawn("gaming_console", parent, new Vector3(7.05f, up + benchTop, 5.72f), 15);
             Solid(ArtLibrary.Spawn("Ottoman_01", parent, new Vector3(6.6f, up, 7.05f), 180));
             ArtLibrary.Spawn("gamepad", parent, new Vector3(6.75f, up + 0.42f, 7.0f), 160);
-            Sign(parent, "PLAY ME · GAMES DEMO", new Vector3(6.6f, up + 2.05f, 5.4f), 180f, 0.09f, Electronica, Color.white, true, 0.9f);
+            Sign(parent, "PLAY ME · GAMES DEMO", new Vector3(6.6f, up + 1.75f, 5.45f), 180f, 0.09f, Electronica, Color.white, true, 0.9f);
             lighting.AddGlow(new Vector3(6.6f, up + 1.5f, 6.4f), new Color(0.45f, 1f, 0.6f), 3.5f, 0.6f);
             // Homeware shelves against the east wall, south of the lounge.
             var unit = new GameObject("Gallery shelf unit").transform;

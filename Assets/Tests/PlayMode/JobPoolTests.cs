@@ -14,10 +14,11 @@ namespace NightSupermarket.Tests
     {
         [UnityTest] public IEnumerator DrawnJobsAreBuiltAndReachableOnSeveralShifts()
         {
-            foreach (int shift in new[] { 1, 2, 3, 5, 8, 13 })
+            foreach (int shift in new[] { 1, 2, 3, 5, 6, 8, 13 }) // 6 draws the atrium planters
             {
                 PrototypeRoot.NextShift = shift;
                 yield return SceneManager.LoadSceneAsync("Prototype"); yield return null;
+                yield return new WaitForSeconds(0.3f); // the furniture's NavMesh carving settles a few frames after loading
                 var root = Object.FindAnyObjectByType<PrototypeRoot>();
                 Assert.That(root.Shift, Is.EqualTo(shift));
                 Assert.That(root.Missions.Missions.Count, Is.EqualTo(JobCatalog.PerNight), "shift " + shift);
@@ -33,7 +34,7 @@ namespace NightSupermarket.Tests
                     Assert.That(offFloor, Is.LessThan(0.9f), "shift " + shift + ": " + job.Rule.Id + " target " + at + " is " + offFloor.ToString("0.0") + " m from walkable floor — inside furniture?");
                     var path = new NavMeshPath();
                     Assert.That(NavMesh.CalculatePath(start.position, end.position, NavMesh.AllAreas, path), Is.True);
-                    Assert.That(path.status, Is.EqualTo(NavMeshPathStatus.PathComplete), "shift " + shift + ": no walkable path to " + job.Rule.Id);
+                    Assert.That(path.status, Is.EqualTo(NavMeshPathStatus.PathComplete), "shift " + shift + ": no walkable path to " + job.Rule.Id + " at " + at + " (floor " + end.position + ")");
                     Assert.That(builder.How(job.Rule.Id), Is.Not.Empty);
                 }
                 foreach (var pink in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))

@@ -167,6 +167,48 @@ Now a night leaves something behind you can see and use the next night.
   to the fire exit, the ramp's height halfway up, gems on walkable floor and not inside fixtures, dark
   before lights out and lit after, the shutter down and the front door blocked after lockdown.
 
+## Twelfth pass — the guard comes to look, the whole mall every night, a readable end card
+
+From the second playtest: "I moved in front of the guard, stopped, and nothing happened."
+
+### The close look (`GuardController.LookInto / LookOver`, `PrototypeRoot.TickInspection`)
+
+- **He saw you move and you froze: he walks over.** The Red state now sends the guard to the spot
+  (an investigation, like a noise or a report). The tip says so: "He saw that. He's coming to look — hold a pose
+  that fits this department, or he'll grab you."
+- **Up close, standing still is not enough.** Within 2.1 m, looking at a suspicious body, he stops and looks it
+  over. A pose that fits the department (Display in Clothing and the toy store, Browsing in Electronics and the
+  aisles, Lounging in Home, the gallery and the atrium, Staff at the checkout), display clothes, the crowd, or a
+  seat fools him in 1.8 s: "Huh. Just a mannequin", a close call, and for 8 s he takes you for furniture. A body
+  that just stands there is grabbed after 2.5 s. The cover chip turns red and counts down either way. Moving
+  while he looks still works as before: suspicion, the chase, caught.
+- A hiding spot he walks right up to is a hiding spot he has found: it does not fool the close look.
+
+### Every night crosses the whole mall (`JobCatalog.Draw`, `JobArea`)
+
+- A night now draws **one job on the supermarket floor, one out in the mall (atrium, toy store) and one up in
+  the gallery**, never two of a family. Shift 0 keeps the classic trio for the tests.
+- Two new jobs so the mall and gallery pools have three each:
+  - **Water two of the atrium planters** (hold, 3 s each, a watering can on the rim) — in the sweep of the two
+    atrium cameras.
+  - **Carry the throw pillows up to the gallery sofa** (carry): from the ottoman in Home, up the escalator or the
+    stairs, G on the rug by the gallery sofa.
+
+### End card
+
+- The detail text had three lines in a box for two and a half, so it ran into the score list; and a long night can
+  earn more kinds of points than the card had rows for, so they spilled over the footer. The box is taller, the
+  rows squeeze and their text shrinks to fit.
+- The card says what the night unlocked ("★ NEW NIGHT UNLOCKED: Blackout — pick it on the menu") or how many
+  nights until the next special night, and the footer says ENTER / N go back to the menu.
+
+### Tests
+
+- PlayMode `GuardInspectionTests`: standing still in front of the guard in Red gets you grabbed after the look;
+  the Display pose in Clothing fools him (close call, suspicion 0, back to Green, no second look); seen moving
+  from 7 m, he walks over.
+- `JobPoolTests` also runs shift 6 (the planters). New capture `end_card`.
+
 ## Eleventh pass — sit and ride, readable speech, a real live stream, and a gallery worth climbing to
 
 From the first full playtest of the tenth pass (86/88 PlayMode tests; the TV test's two sets overlapped).
